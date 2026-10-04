@@ -2435,3 +2435,349 @@ input[type="range"]::-moz-range-thumb {
     line-height: 32px;
   }
 }
+
+/* ---------- live-обновления: переключатель игрока ---------- */
+
+.player-switch {
+  position: relative;
+}
+
+.switch-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 32px rgba(17, 24, 39, 0.14);
+  padding: 8px;
+  z-index: 60;
+  animation: pop-in 0.14s ease;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.switch-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-tertiary);
+  padding: 6px 10px 4px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.switch-row:hover {
+  background: #f9fafb;
+}
+
+.switch-row.active {
+  background: var(--color-red-light);
+}
+
+.switch-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.switch-vip {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.switch-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.switch-balance .coin {
+  width: 14px;
+  height: 14px;
+}
+
+.switch-foot {
+  border-top: 1px solid var(--color-border);
+  margin-top: 6px;
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+/* ---------- тосты ---------- */
+
+.toast-host {
+  pointer-events: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  width: min(460px, calc(100vw - 32px));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #1f2937;
+  color: #fff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.3);
+  animation: toast-in 0.18s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-ico {
+  display: inline-flex;
+  margin-top: 1px;
+}
+
+.toast-error {
+  background: #c81e24;
+}
+
+.toast-success {
+  background: #14804a;
+}
+
+/* ---------- лототрон и веса ---------- */
+
+.drum-wrap {
+  padding: 12px 0 4px;
+}
+
+.weight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f9fafb;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+}
+
+.weight-row .name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.mini-ball {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset -2px -3px 5px rgba(0, 0, 0, 0.25), inset 2px 2px 4px rgba(255, 255, 255, 0.35);
+  flex: none;
+}
+
+/* ---------- варианты при нехватке баллов ---------- */
+
+.alt-room {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+/* ---------- анализ конфигуратора ---------- */
+
+.analysis-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.anote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.anote svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.anote-good {
+  background: var(--color-green-light);
+  color: var(--color-green-text);
+}
+
+.anote-warn {
+  background: var(--color-orange-light);
+  color: #92610a;
+}
+
+.anote-risk,
+.anote-block {
+  background: var(--color-red-light);
+  color: #c91c25;
+}
+
+.verdict-chip {
+  margin-top: 12px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.verdict-good {
+  color: var(--color-green-text);
+}
+
+.verdict-warn {
+  color: #b45309;
+}
+
+.verdict-risk,
+.verdict-block {
+  color: #c91c25;
+}
+
+/* ---------- proof-of-RNG в журнале ---------- */
+
+.proof {
+  padding: 8px 4px;
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.win-row td {
+  background: var(--color-yellow-light) !important;
+}
+
+@media (max-width: 900px) {
+  .proof-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fund-live {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.fund-live b {
+  color: var(--color-red);
+}
+
+/* ---------- розыгрыш: современная сцена лототрона ---------- */
+
+.drum-wrap {
+  background:
+    radial-gradient(circle at 50% 40%, rgba(227, 30, 36, 0.07) 0, transparent 62%),
+    var(--color-red-light);
+  border-radius: var(--radius-large);
+  padding: 18px 12px 10px;
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.live-badge i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d52;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.72);
+  }
+}

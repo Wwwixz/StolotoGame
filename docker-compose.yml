@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: quickgame-db
+    environment:
+      POSTGRES_DB: quickgame
+      POSTGRES_USER: quickgame
+      POSTGRES_PASSWORD: quickgame
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quickgame -d quickgame"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: quickgame-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/quickgame
+      SPRING_DATASOURCE_USERNAME: quickgame
+      SPRING_DATASOURCE_PASSWORD: quickgame
+      # Демо-режим: движок сам поддерживает несколько живых комнат в лобби
+      GAME_AUTOHOST: "true"
+    ports:
+      - "8081:8080" # прямой доступ к API для экспертов: http://localhost:8081/api/rooms
+
+  frontend:
+    build: ./frontend
+    container_name: quickgame-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80" # приложение: http://localhost:8080
+
+volumes:
+  pgdata:

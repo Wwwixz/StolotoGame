@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ROOMS } from "../data";
+import { useLobby } from "../hooks";
 import RoomCard from "../components/RoomCard";
 
 type SortKey = "fund" | "price" | "places" | "speed";
@@ -21,30 +21,31 @@ const PRICE_FILTERS: [number | null, string][] = [
 ];
 
 export default function Games() {
+  const rooms = useLobby();
   const [sort, setSort] = useState<SortKey>("fund");
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
 
-  const rooms = useMemo(() => {
-    let list = [...ROOMS];
-    if (maxPrice) list = list.filter((r) => r.price <= maxPrice);
+  const list = (() => {
+    let l = [...rooms];
+    if (maxPrice) l = l.filter((r) => r.price <= maxPrice);
     switch (sort) {
       case "fund":
-        list.sort((a, b) => b.prizePool - a.prizePool);
+        l.sort((a, b) => b.projectedFund - a.projectedFund);
         break;
       case "price":
-        list.sort((a, b) => a.price - b.price);
+        l.sort((a, b) => a.price - b.price);
         break;
       case "places":
-        list.sort((a, b) => b.places - a.places);
+        l.sort((a, b) => b.seats - a.seats);
         break;
       case "speed":
-        list.sort(
-          (a, b) => Number(!!b.fastDraw) - Number(!!a.fastDraw) || a.price - b.price,
+        l.sort(
+          (a, b) => b.occupied / b.seats - a.occupied / a.seats || a.price - b.price,
         );
         break;
     }
-    return list;
-  }, [sort, maxPrice]);
+    return l;
+  })();
 
   return (
     <>
@@ -66,7 +67,7 @@ export default function Games() {
       </div>
 
       <div className="section-head" style={{ alignItems: "center" }}>
-        <h3>Открытые комнаты ({rooms.length})</h3>
+        <h3>Открытые комнаты ({list.length})</h3>
         <select
           className="select"
           style={{ width: 260, height: 40 }}
@@ -94,12 +95,12 @@ export default function Games() {
       </div>
 
       <div className="grid-cards">
-        {rooms.map((r) => (
+        {list.map((r) => (
           <RoomCard key={r.id} room={r} />
         ))}
       </div>
 
-      {rooms.length === 0 && (
+      {list.length === 0 && (
         <div className="panel" style={{ textAlign: "center", color: "var(--color-text-secondary)" }}>
           Под фильтр ничего не попало — подними цену входа
         </div>

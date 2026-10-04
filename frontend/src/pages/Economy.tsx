@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
-import { ROOMS, fmt } from "../data";
-import { calcEconomy, type RoomParams, type Verdict } from "../economy";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../api";
+import { fmt } from "../data";
+import type { EconomyAnalysis, RoomParams, SystemStats } from "../types";
 import { AdminTabs } from "../components/admin";
 import { Coin, Icon, Stat } from "../components/ui";
+
+type Verdict = "good" | "warn" | "risk";
 
 const VERDICT_META: Record<Verdict, { icon: "shield" | "warn"; title: string; cls: string }> = {
   good: { icon: "shield", title: "Сбалансированная конфигурация", cls: "good" },
@@ -10,28 +13,78 @@ const VERDICT_META: Record<Verdict, { icon: "shield" | "warn"; title: string; cl
   risk: { icon: "warn", title: "Невыгодная конфигурация", cls: "risk" },
 };
 
-const VERDICT_TAG: Record<Verdict, string> = {
+const VERDICT_TAG: Record<string, string> = {
   good: "Сбалансировано",
   warn: "Рискованно",
   risk: "Невыгодно",
+  BLOCK: "Запрещено",
 };
 
-const DEFAULTS = { places: 10, price: 100, fundPercent: 85, boostPercent: 25, boostPrice: 50 };
+const DEFAULTS: RoomParams = { places: 10, price: 100, fundPercent: 85, boostPercent: 25, boostPrice: 50 };
+
+/** Расчёты те же, что в EconomyService бэкенда — страница интерактивная, бэкенд проверяет при сохранении. */
+function calcEconomy(p: RoomParams) {
+  const places = Math.max(2, p.places);
+  const pot = places * p.price;
+  const prizeFund = Math.round(pot * (p.fundPercent / 100));
+  const systemShare = pot - prizeFund;
+  const baseProb = 1 / places;
+  const boostedProb = Math.min(1, baseProb * (1 + p.boostPercent / 100));
+  const evPlayer = Math.round(prizeFund * baseProb - p.price);
+  const evBoosted = Math.round(prizeFund * boostedProb - p.price - p.boostPrice);
+  const boostGain = evBoosted - evPlayer;
+  const boostFairPrice = Math.round(prizeFund * baseProb * (p.boostPercent / 100));
+  const evPct = p.price ? evPlayer / p.price : 0;
+  return { pot, prizeFund, systemShare, baseProb, boostedProb, evPlayer, boostGain, boostFairPrice, evPct };
+}
 
 export default function Economy() {
   const [p, setP] = useState<RoomParams>({ ...DEFAULTS });
   const res = useMemo(() => calcEconomy(p), [p]);
-  const meta = VERDICT_META[res.verdict];
+  const [compare, setCompare] = useState<{ room: { id: number; title: string; seats: number }; analysis: EconomyAnalysis }[]>([]);
+  const [stats, setStats] = useState<SystemStats | null>(null);
+
+  useEffect(() => {
+    api.compare().then(setCompare).catch(() => setCompare([]));
+    api.systemStats().then(setStats).catch(() => undefined);
+  }, []);
 
   const set = (key: keyof RoomParams) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setP((prev) => ({ ...prev, [key]: Number(e.target.value) }));
 
-  const compare = ROOMS.map((room) => ({ room, res: calcEconomy(room) }));
+  const verdict: Verdict =
+    res.evPct > -0.05 || p.fundPercent > 95 ? "risk" : p.fundPercent < 70 || res.boostGain > 0 || res.evPct < -0.35 ? "warn" : "good";
+  const meta = VERDICT_META[verdict];
+
+  const reasons: { tone: Verdict; text: string }[] = [
+    p.fundPercent > 95
+      ? { tone: "risk", text: `Фонд ${p.fundPercent}% — организатор зарабатывает почти ничего (${fmt(res.systemShare)} за раунд)` }
+      : p.fundPercent < 70
+        ? { tone: "warn", text: `Фонд ${p.fundPercent}% — игрок отдаёт больше трети взноса системе` }
+        : { tone: "good", text: `В фонд идёт ${p.fundPercent}% взносов — сбалансированное распределение` },
+    res.evPct > -0.05
+      ? { tone: "risk", text: "Игрок почти в нуле — комната слишком щедрая, это неконтролируемый рост обязательств" }
+      : res.evPct < -0.35
+        ? { tone: "warn", text: `Ожидание игрока ${Math.round(res.evPct * 100)}% от цены входа — слишком жадно` }
+        : { tone: "good", text: `Ожидание игрока ${Math.round(res.evPct * 100)}% от цены входа — здоровая экономика` },
+    res.boostGain > 0
+      ? { tone: "risk", text: `Буст повышает ожидание игрока на ${fmt(res.boostGain)} — поднимите цену буста выше ${fmt(p.boostPrice + res.boostGain)}` }
+      : { tone: "good", text: `Буст не убыточен: справедливая цена до ${fmt(res.boostFairPrice)}` },
+  ];
 
   return (
     <>
       <h1 className="page-title">Анализ экономики</h1>
       <AdminTabs active="economy" />
+
+      {stats && (
+        <div className="stat-row" style={{ marginBottom: 16 }}>
+          <Stat icon={<Icon name="gamepad" />} value={String(stats.roundsPlayed)} label="раундов сыграно" />
+          <Stat icon={<Coin />} value={fmt(stats.totalFund)} label="оборот баллов" tone="gold" />
+          <Stat icon={<Icon name="trophy" />} value={fmt(stats.totalPayouts)} label="выплачено игрокам" tone="red" />
+          <Stat icon={<Icon name="wallet" />} value={fmt(stats.systemIncome)} label="доход системы" tone="green" />
+        </div>
+      )}
 
       <div className={`verdict ${meta.cls}`}>
         <span className="v-ico">
@@ -40,7 +93,7 @@ export default function Economy() {
         <div>
           <b>{meta.title}</b>
           <ul>
-            {res.reasons.map((r, i) => (
+            {reasons.map((r, i) => (
               <li key={i}>
                 <Icon name={r.tone === "good" ? "check" : "warn"} size={14} />
                 {r.text}
@@ -50,14 +103,9 @@ export default function Economy() {
         </div>
       </div>
 
-      <div className="stat-row" style={{ marginBottom: 16 }}>
+      <div className="stat-row" style={{ margin: "16px 0" }}>
         <Stat icon={<Coin />} value={fmt(res.pot)} label="взносы за раунд" tone="gold" />
-        <Stat
-          icon={<Icon name="trophy" />}
-          value={fmt(res.prizeFund)}
-          label="призовой фонд"
-          tone="red"
-        />
+        <Stat icon={<Icon name="trophy" />} value={fmt(res.prizeFund)} label="призовой фонд" tone="red" />
         <Stat icon={<Icon name="wallet" />} value={fmt(res.systemShare)} label="доля системы" tone="green" />
         <Stat
           icon={<Icon name="percent" />}
@@ -75,7 +123,7 @@ export default function Economy() {
             <label>Количество мест</label>
             <div className="range-wrap">
               <span className="range-val">{p.places}</span>
-              <input type="range" min={2} max={50} value={p.places} onChange={set("places")} />
+              <input type="range" min={2} max={10} value={p.places} onChange={set("places")} />
             </div>
           </div>
           <div className="field">
@@ -89,41 +137,21 @@ export default function Economy() {
             <label>Процент фонда</label>
             <div className="range-wrap">
               <span className="range-val">{p.fundPercent}%</span>
-              <input
-                type="range"
-                min={50}
-                max={100}
-                value={p.fundPercent}
-                onChange={set("fundPercent")}
-              />
+              <input type="range" min={50} max={100} value={p.fundPercent} onChange={set("fundPercent")} />
             </div>
           </div>
           <div className="field">
             <label>Эффект буста</label>
             <div className="range-wrap">
               <span className="range-val">+{p.boostPercent}%</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={p.boostPercent}
-                onChange={set("boostPercent")}
-              />
+              <input type="range" min={0} max={100} step={5} value={p.boostPercent} onChange={set("boostPercent")} />
             </div>
           </div>
           <div className="field">
             <label>Цена буста</label>
             <div className="range-wrap">
               <span className="range-val">{fmt(p.boostPrice)}</span>
-              <input
-                type="range"
-                min={0}
-                max={200}
-                step={5}
-                value={p.boostPrice}
-                onChange={set("boostPrice")}
-              />
+              <input type="range" min={0} max={200} step={5} value={p.boostPrice} onChange={set("boostPrice")} />
             </div>
           </div>
 
@@ -143,15 +171,7 @@ export default function Economy() {
                 {100 - p.fundPercent >= 20 ? `Система ${fmt(res.systemShare)}` : ""}
               </span>
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                marginTop: 8,
-                fontSize: 11.5,
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <div style={{ display: "flex", gap: 14, marginTop: 8, fontSize: 11.5, color: "var(--color-text-secondary)" }}>
               <span className="legend-dot" style={{ background: "var(--color-red)" }} /> призовой фонд
               <span className="legend-dot" style={{ background: "var(--color-yellow)" }} /> доля системы
             </div>
@@ -172,16 +192,11 @@ export default function Economy() {
               <b>{(res.boostedProb * 100).toFixed(1).replace(".", ",")}%</b>
             </div>
           </div>
-
-          <div className="panel">
-            <h3>EV игрока vs процент фонда</h3>
-            <EvChart price={p.price} boostGain={res.boostGain} fundPercent={p.fundPercent} />
-          </div>
         </div>
       </div>
 
       <div className="panel" style={{ marginTop: 16 }}>
-        <h3>Сравнение комнат</h3>
+        <h3>Открытые комнаты: экономика (данные backend)</h3>
         <table className="table">
           <thead>
             <tr>
@@ -194,10 +209,10 @@ export default function Economy() {
             </tr>
           </thead>
           <tbody>
-            {compare.map(({ room, res: r }) => (
+            {compare.map(({ room, analysis: r }) => (
               <tr key={room.id}>
                 <td style={{ fontWeight: 600 }}>
-                  {room.name} · {room.places} мест
+                  {room.title} · {room.seats} мест
                 </td>
                 <td>{fmt(r.pot)}</td>
                 <td>{fmt(r.prizeFund)}</td>
@@ -207,11 +222,18 @@ export default function Economy() {
                 </td>
                 <td>
                   <span className={`tag-${r.verdict === "good" ? "win" : r.verdict === "warn" ? "warn" : "lose"}`}>
-                    ● {VERDICT_TAG[r.verdict]}
+                    ● {VERDICT_TAG[r.verdict] ?? r.verdict}
                   </span>
                 </td>
               </tr>
             ))}
+            {compare.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: "center", color: "var(--color-text-secondary)" }}>
+                  Нет открытых комнат
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -223,96 +245,22 @@ export default function Economy() {
             <b>Взносы за раунд</b> = количество мест × цена входа
           </li>
           <li>
-            <b>Призовой фонд</b> = взносы × процент фонда. Остаток — <b>доля системы</b>
+            <b>Призовой фонд</b> = взносы × процент фонда. Остаток — <b>доход системы</b>. Если побеждает бот,
+            приз также остаётся системе
           </li>
           <li>
-            <b>Вероятность победы</b> = 1 / количество мест. Буст умножает вес игрока: +
-            {p.boostPercent}% к вероятности
+            <b>Вероятность победы</b> = вес игрока / суммарный вес. Вес = 1, с бустом — 1 + эффект буста
           </li>
           <li>
-            <b>EV игрока</b> (ожидаемая ценность) = призовой фонд × вероятность − цена входа.
-            Отрицательный EV — норма: это цена эмоции. Слишком отрицательный (&lt; −35%) — комната
-            непривлекательна
+            <b>EV игрока</b> = призовой фонд × вероятность − цена входа. Отрицательный EV — норма (цена
+            эмоции), но ниже −35% комната непривлекательна
           </li>
           <li>
-            <b>Справедливая цена буста</b> = призовой фонд × вероятность × эффект буста — максимум,
-            при котором буст не убыточен игроку. Выше неё буст зарабатывает системе
+            <b>Справедливая цена буста</b> = призовой фонд × вероятность × эффект буста — максимум, при
+            котором буст не убыточен игроку
           </li>
         </ul>
       </details>
     </>
-  );
-}
-
-function EvChart({
-  price,
-  boostGain,
-  fundPercent,
-}: {
-  price: number;
-  boostGain: number;
-  fundPercent: number;
-}) {
-  const W = 340;
-  const H = 150;
-  const L = 38;
-  const R = 12;
-  const T = 12;
-  const B = 26;
-  const fMin = 50;
-  const fMax = 100;
-  const vMin = -60;
-  const vMax = 0;
-
-  const x = (f: number) => L + ((f - fMin) / (fMax - fMin)) * (W - L - R);
-  const y = (v: number) => T + ((vMax - v) / (vMax - vMin)) * (H - T - B);
-  const boostShift = price ? (boostGain / price) * 100 : 0;
-
-  const line = (shift: number) => {
-    const pts: string[] = [];
-    for (let f = fMin; f <= fMax; f += 2.5) pts.push(`${x(f).toFixed(1)},${y(f - 100 + shift).toFixed(1)}`);
-    return pts.join(" ");
-  };
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="ev-chart">
-      <line x1={L} y1={y(0)} x2={W - R} y2={y(0)} stroke="#19A463" strokeWidth="1" opacity="0.6" />
-      <line
-        x1={L}
-        y1={y(-50)}
-        x2={W - R}
-        y2={y(-50)}
-        stroke="#E5E7EB"
-        strokeWidth="1"
-        strokeDasharray="4 4"
-      />
-      <polyline points={line(0)} fill="none" stroke="#3478F6" strokeWidth="2.5" />
-      <polyline
-        points={line(boostShift)}
-        fill="none"
-        stroke="#F59E0B"
-        strokeWidth="2.5"
-        strokeDasharray="6 4"
-      />
-      <circle cx={x(fundPercent)} cy={y(fundPercent - 100)} r="4.5" fill="#E31E24" />
-      <text x={L - 6} y={y(0) + 3} textAnchor="end" className="ev-label">
-        0
-      </text>
-      <text x={L - 6} y={y(-50) + 3} textAnchor="end" className="ev-label">
-        −50
-      </text>
-      <text x={x(50)} y={H - 8} textAnchor="middle" className="ev-label">
-        50%
-      </text>
-      <text x={x(75)} y={H - 8} textAnchor="middle" className="ev-label">
-        75%
-      </text>
-      <text x={x(100)} y={H - 8} textAnchor="middle" className="ev-label">
-        100%
-      </text>
-      <text x={W - R} y={T + 2} textAnchor="end" className="ev-label">
-        % от цены входа
-      </text>
-    </svg>
   );
 }

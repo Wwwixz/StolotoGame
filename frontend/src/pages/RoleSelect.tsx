@@ -44,7 +44,9 @@ export default function RoleSelect() {
           </button>
         </div>
 
-        <span className="landing-foot">Кубок России по продуктивному программированию · React + TypeScript</span>
+        <span className="landing-foot">
+          Кубок России по продуктивному программированию · Java (Spring Boot) + React + PostgreSQL + Docker
+        </span>
       </div>
     </div>
   );

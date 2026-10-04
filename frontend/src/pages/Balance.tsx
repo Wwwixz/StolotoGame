@@ -1,14 +1,34 @@
-import { BALANCE, RESERVE, SYS_FUND, TOTAL_BALANCE, TRANSACTIONS, fmt } from "../data";
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { usePlayer } from "../player";
+import { fmt, fmtSigned, fmtDateTime } from "../data";
+import type { SystemStats, TxRow } from "../types";
 import { Coin, Icon } from "../components/ui";
 
-const TX_ICONS: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
-  "Вход в комнату #2847": { icon: "users", tone: "tx-ico" },
-  "Выигрыш": { icon: "trophy", tone: "tx-ico green" },
-  "Резерв": { icon: "wallet", tone: "tx-ico" },
-  "Буст": { icon: "zap", tone: "tx-ico gold" },
+const TX_META: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
+  RESERVE: { icon: "users", tone: "tx-ico" },
+  REFUND: { icon: "wallet", tone: "tx-ico" },
+  BOOST: { icon: "zap", tone: "tx-ico gold" },
+  WIN: { icon: "trophy", tone: "tx-ico green" },
 };
 
 export default function Balance() {
+  const { me } = usePlayer();
+  const [tx, setTx] = useState<TxRow[]>([]);
+  const [stats, setStats] = useState<SystemStats | null>(null);
+
+  useEffect(() => {
+    api.systemStats().then(setStats).catch(() => undefined);
+  }, [me?.balance]);
+
+  useEffect(() => {
+    if (!me) return;
+    api.transactions(me.id).then(setTx).catch(() => undefined);
+  }, [me?.id, me?.balance]);
+
+  if (!me) return null;
+  const total = me.balance + me.reserved;
+
   return (
     <>
       <h1 className="page-title">Баланс</h1>
@@ -18,28 +38,28 @@ export default function Balance() {
           <Coin lg />
           <div>
             <div className="lbl">Доступно</div>
-            <div className="val">{fmt(BALANCE)}</div>
+            <div className="val">{fmt(me.balance)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg blue />
           <div>
             <div className="lbl">В резерве</div>
-            <div className="val">{fmt(RESERVE)}</div>
+            <div className="val">{fmt(me.reserved)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg />
           <div>
-            <div className="lbl">Системный фонд</div>
-            <div className="val">{fmt(SYS_FUND)}</div>
+            <div className="lbl">Доход системы</div>
+            <div className="val">{fmt(stats?.systemIncome ?? 0)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg />
           <div>
             <div className="lbl">Общий баланс</div>
-            <div className="val">{fmt(TOTAL_BALANCE)}</div>
+            <div className="val">{fmt(total)}</div>
           </div>
         </div>
       </div>
@@ -54,30 +74,33 @@ export default function Balance() {
           }}
         >
           <h3 style={{ margin: 0 }}>Последние операции</h3>
-          <a href="#" style={{ color: "var(--color-red)", fontSize: 13, fontWeight: 600 }}>
-            Все →
-          </a>
+          <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+            Раундов сыграно: {stats?.roundsPlayed ?? 0} · выплатлено: {fmt(stats?.totalPayouts ?? 0)}
+          </span>
         </div>
 
-        {TRANSACTIONS.map((t, i) => {
-          const meta = TX_ICONS[t.title] ?? { icon: "wallet" as const, tone: "tx-ico" };
+        {tx.map((t) => {
+          const meta = TX_META[t.type] ?? { icon: "wallet" as const, tone: "tx-ico" };
           return (
-            <div className="tx-row" key={i}>
+            <div className="tx-row" key={t.id}>
               <span className={meta.tone}>
                 <Icon name={meta.icon} size={16} />
               </span>
               <span>
                 <span className="name">{t.title}</span>
                 <br />
-                <span className="date">{t.date}</span>
+                <span className="date">{fmtDateTime(t.createdAt)}</span>
               </span>
-              <span className={`amt ${t.amount >= 0 ? "plus" : "minus"}`}>
-                {t.amount >= 0 ? "+" : "−"}
-                {fmt(Math.abs(t.amount))}
-              </span>
+              <span className={`amt ${t.amount >= 0 ? "plus" : "minus"}`}>{fmtSigned(t.amount)}</span>
             </div>
           );
         })}
+
+        {tx.length === 0 && (
+          <div style={{ color: "var(--color-text-secondary)", textAlign: "center", padding: 20 }}>
+            Операций пока нет
+          </div>
+        )}
       </div>
     </>
   );
