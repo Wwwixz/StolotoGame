@@ -2,29 +2,44 @@ import type { ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   Bot,
+  CalendarDays,
   ChartNoAxesCombined,
+  ChevronDown,
+  ChevronRight,
   ChevronsUp,
   CircleCheck,
   Clock3,
   Coins,
   Crown,
+  Eye,
+  Filter,
   Flame,
+  Gamepad2,
   Gift,
   Grid2X2,
   History,
   House,
+  Info,
+  Minus,
   Percent,
+  Play,
+  Plus,
+  RotateCcw,
   Search,
   Settings,
+  ShieldCheck,
+  SlidersHorizontal,
   Star,
   TriangleAlert,
   Trophy,
   User,
   Users,
+  X,
   Zap,
 } from "lucide-react";
-import { AVA_COLORS } from "../data";
+import { BotFace, PlayerFace } from "./graphics";
 
 /* ---------- иконки (Lucide React, как в спеке) ---------- */
 
@@ -52,6 +67,21 @@ const MAP = {
   crown: Crown,
   gift: Gift,
   up: ChevronsUp,
+  sliders: SlidersHorizontal,
+  filter: Filter,
+  chevronDown: ChevronDown,
+  chevronRight: ChevronRight,
+  x: X,
+  plus: Plus,
+  minus: Minus,
+  play: Play,
+  rotate: RotateCcw,
+  eye: Eye,
+  info: Info,
+  calendar: CalendarDays,
+  chart: BarChart3,
+  shield: ShieldCheck,
+  gamepad: Gamepad2,
 } as const;
 
 export type IconName = keyof typeof MAP;
@@ -99,22 +129,21 @@ export function Avatar({
       </span>
     );
   }
+  const px = { sm: 28, md: 32, lg: 40, xl: 56 }[size];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+
   const inner = bot ? (
-    <span className={`ava ${size}`} style={{ background: "var(--color-blue-light)" }}>
-      <Bot size={size === "sm" ? 14 : 18} color="var(--color-blue)" />
+    <span className={`ava ${size}`} title={name}>
+      <BotFace variant={(hash % 3) + 1} size={px} />
     </span>
   ) : (
-    (() => {
-      let hash = 0;
-      for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-      const bg = AVA_COLORS[hash % AVA_COLORS.length];
-      const label = name.slice(0, 2).toUpperCase();
-      return (
-        <span className={`ava ${size}${you ? " you" : ""}`} style={{ background: bg }} title={name}>
-          {label}
-        </span>
-      );
-    })()
+    <span
+      className={`ava ${size}${you ? " you" : ""}`}
+      title={name}
+    >
+      <PlayerFace variant={(hash % 6) + 1} size={px} />
+    </span>
   );
   if (caption) {
     return (

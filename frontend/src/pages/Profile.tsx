@@ -17,7 +17,7 @@ export default function Profile() {
       <h1 className="page-title">Профиль</h1>
 
       <div className="panel profile-head">
-        <Avatar name="АК" size="xl" />
+        <Avatar name={CURRENT_USER} size="xl" />
         <div className="profile-id">
           <div className="profile-name">
             {CURRENT_USER} <YouBadge />

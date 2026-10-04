@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BOTS, COMBOS, CURRENT_USER, PARTICIPANTS, WINNERS, fmt, getRoom } from "../data";
-import { Avatar, Icon, YouBadge } from "../components/ui";
+import { Avatar, YouBadge } from "../components/ui";
+import { WinnerTrophy } from "../components/graphics";
 
 const COLORS = ["#e31e24", "#ffc400", "#3478f6", "#19a463", "#7b5cf0"];
 
@@ -48,9 +49,7 @@ export default function Winners() {
           ))}
         </div>
 
-        <span style={{ display: "inline-flex", color: "var(--color-yellow)" }}>
-          <Icon name="trophy" size={54} strokeWidth={1.6} />
-        </span>
+        <WinnerTrophy size={110} />
         <h2>Победители!</h2>
 
         <div className="hero-winner">

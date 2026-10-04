@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AdminTabs, KV, Panel } from "../components/admin";
 import { Icon } from "../components/ui";
 
 export default function AdminConfigurator() {
+  const navigate = useNavigate();
   const [name, setName] = useState("Классическая");
   const [places, setPlaces] = useState("10");
   const [price, setPrice] = useState("100");
@@ -64,7 +66,9 @@ export default function AdminConfigurator() {
             <button className="btn btn-red" onClick={() => setSaved(true)}>
               {saved ? "Сохранено ✓" : "Сохранить"}
             </button>
-            <button className="btn btn-ghost">Проверить</button>
+            <button className="btn btn-ghost" onClick={() => navigate("/economy")}>
+              Проверить
+            </button>
           </div>
         </Panel>
 

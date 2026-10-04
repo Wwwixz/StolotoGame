@@ -244,23 +244,16 @@ select {
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 0 20px;
-  height: 52px;
+  padding: 2px 0 14px;
+  margin-bottom: 4px;
+  overflow: hidden;
 }
 
-.logo-mark {
-  width: 32px;
-  height: 32px;
-  flex: none;
+.logo-img {
   display: block;
-}
-
-.logo-name {
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.5px;
-  color: var(--color-red);
+  height: 40px;
+  width: auto;
+  max-width: 100%;
 }
 
 .nav {
@@ -1385,6 +1378,11 @@ input[type="range"]::-moz-range-thumb {
   user-select: none;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.15);
+  overflow: hidden;
+}
+
+.ava svg {
+  display: block;
 }
 
 .ava.md {
@@ -2180,6 +2178,203 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .ach.locked b {
+  color: var(--color-text-secondary);
+}
+
+/* ---------- economy analytics ---------- */
+
+.verdict {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border: 1.5px solid;
+}
+
+.verdict.good {
+  background: var(--color-green-light);
+  border-color: #b7e4cc;
+}
+.verdict.warn {
+  background: var(--color-orange-light);
+  border-color: #f8d8a8;
+}
+.verdict.risk {
+  background: var(--color-red-light);
+  border-color: #f5b7bb;
+}
+
+.verdict .v-ico {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: #fff;
+}
+
+.verdict.good .v-ico {
+  color: var(--color-green);
+}
+.verdict.warn .v-ico {
+  color: var(--color-orange);
+}
+.verdict.risk .v-ico {
+  color: var(--color-red);
+}
+
+.verdict b {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.verdict ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.verdict li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.verdict li svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.split-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.split-bar .part {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.split-bar .fund {
+  background: var(--color-red);
+  color: #fff;
+}
+
+.split-bar .sys {
+  background: var(--color-yellow);
+  color: #6b4d00;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.prob-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.prob-bar-row b {
+  color: var(--color-text);
+  min-width: 52px;
+}
+
+.prob-bar-row span:first-child {
+  width: 72px;
+  flex: none;
+}
+
+.prob-bar {
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+
+.prob-bar div {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--color-blue);
+}
+
+.prob-bar-row.boost .prob-bar div {
+  background: var(--color-red);
+}
+
+.prob-bar-row.boost b {
+  color: var(--color-red);
+}
+
+.ev-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ev-label {
+  font-size: 10px;
+  fill: var(--color-text-secondary);
+  font-family: inherit;
+}
+
+.tag-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-yellow-light);
+  color: #a16207;
+  border: 1px solid #f5d56a;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.how {
+  margin-top: 16px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px 20px;
+}
+
+.how summary {
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.how ul {
+  margin: 12px 0 4px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--color-text-secondary);
 }
 

@@ -1,7 +1,8 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BALANCE, fmt } from "../data";
+import { BALANCE, CURRENT_USER, fmt } from "../data";
 import { useRole } from "../role";
 import { Avatar, Coin, Icon } from "./ui";
+import { Logo } from "./graphics";
 
 const NAV = [
   { to: "/lobby", label: "Главная", icon: "home", end: true },
@@ -25,24 +26,7 @@ export default function Layout() {
     <div className="app">
       <aside className="sidebar">
         <Link to="/lobby" className="logo">
-          <svg className="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
-            <defs>
-              <linearGradient id="logoRed" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#ff5154" />
-                <stop offset="1" stopColor="#e31e24" />
-              </linearGradient>
-            </defs>
-            <circle cx="20" cy="20" r="20" fill="url(#logoRed)" />
-            <circle cx="21.7" cy="10" r="3.5" fill="#fff" />
-            <g stroke="#fff" strokeWidth="3.2" strokeLinecap="round" fill="none">
-              <path d="M21.4 15.4 C21.9 18.2 21.5 20.7 20.6 23.3" />
-              <path d="M20.9 16.3 L13.6 11" />
-              <path d="M21.9 15.8 L28.8 10.4" />
-              <path d="M20.6 23.5 C18.3 26.5 15.5 28.8 12.2 30.4" />
-              <path d="M20.9 23.2 C23.1 25.7 25.5 27.3 28.6 28.3" />
-            </g>
-          </svg>
-          <span className="logo-name">СТОЛОТО</span>
+          <Logo />
         </Link>
         <nav className="nav">
           {items.map((n) => (
@@ -69,7 +53,7 @@ export default function Layout() {
             <span className="chev">▼</span>
           </button>
           <Link to="/profile">
-            <Avatar name="АК" size="md" />
+            <Avatar name={CURRENT_USER} size="md" />
           </Link>
         </header>
         <main className="content">
