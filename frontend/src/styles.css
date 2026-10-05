@@ -244,23 +244,15 @@ select {
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 0 20px;
-  height: 52px;
+  padding: 2px 0 14px;
+  overflow: hidden;
 }
 
-.logo-mark {
-  width: 32px;
-  height: 32px;
-  flex: none;
+.logo-img {
   display: block;
-}
-
-.logo-name {
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.5px;
-  color: var(--color-red);
+  height: 40px;
+  width: auto;
+  max-width: 100%;
 }
 
 .nav {
