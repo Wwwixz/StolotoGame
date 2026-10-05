@@ -1,10 +1,9 @@
-import { Link } from "react-router-dom";
-import { useLobby } from "../hooks";
+import { Link, useNavigate } from "react-router-dom";
+import { ROOMS } from "../data";
 import RoomCard from "../components/RoomCard";
 
 export default function Lobby() {
-  const rooms = useLobby();
-
+  const navigate = useNavigate();
   return (
     <>
       <section className="banner">
@@ -15,9 +14,9 @@ export default function Lobby() {
             на бонусные баллы
           </h2>
           <p>Выбирай комнату, заходи, выигрывай!</p>
-          <Link className="btn btn-yellow banner-btn" to="/auto-match">
+          <button className="btn btn-yellow banner-btn" onClick={() => navigate("/auto-match")}>
             Играть
-          </Link>
+          </button>
         </div>
 
         <div className="banner-art" aria-hidden="true">
@@ -72,26 +71,15 @@ export default function Lobby() {
       </section>
 
       <div className="section-head">
-        <h3>Открытые комнаты ({rooms.length})</h3>
+        <h3>Популярные комнаты</h3>
         <Link to="/games">Все комнаты →</Link>
       </div>
 
       <div className="grid-cards">
-        {rooms.map((r) => (
+        {ROOMS.map((r) => (
           <RoomCard key={r.id} room={r} />
         ))}
       </div>
-
-      {rooms.length === 0 && (
-        <div className="panel" style={{ textAlign: "center", color: "var(--color-text-secondary)" }}>
-          Пока нет открытых комнат — система создаст новую, когда кто-то захочет играть.
-          <div style={{ marginTop: 14 }}>
-            <Link className="btn btn-red" to="/auto-match">
-              Подобрать комнату
-            </Link>
-          </div>
-        </div>
-      )}
     </>
   );
 }

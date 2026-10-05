@@ -1,41 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { api } from "../api";
-import { usePlayer } from "../player";
-import { fmtDateTime, fmtSigned, MONTH_START, TODAY, toInputDate } from "../data";
+import { useState } from "react";
+import { useEconomy } from "../state/economy";
+import { MONTH_START, TODAY, toInputDate } from "../data";
 import { Icon } from "../components/ui";
 
 type Tab = "all" | "win" | "lose";
 
 export default function History() {
-  const { me } = usePlayer();
+  const { history } = useEconomy();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
 
-  const [rows, setRows] = useState<ReturnType<typeof mapHistory>>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!me) return;
-    setLoading(true);
-    api
-      .history(me.id)
-      .then(mapHistory)
-      .then(setRows)
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  }, [me?.id]);
-
-  const filtered = useMemo(
-    () =>
-      rows.filter((h) => {
-        if (tab === "win" && !h.win) return false;
-        if (tab === "lose" && h.win) return false;
-        if (q && !h.roomTitle.toLowerCase().includes(q.toLowerCase())) return false;
-        return true;
-      }),
-    [rows, tab, q],
-  );
+  const rows = history.filter((h) => {
+    if (tab === "win" && h.result !== "win") return false;
+    if (tab === "lose" && h.result !== "lose") return false;
+    if (q && !h.room.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  });
 
   return (
     <>
@@ -56,10 +36,22 @@ export default function History() {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-          <input className="input" type="date" defaultValue={toInputDate(MONTH_START)} style={{ width: 170 }} />
+        <div
+          style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}
+        >
+          <input
+            className="input"
+            type="date"
+            defaultValue={toInputDate(MONTH_START)}
+            style={{ width: 170 }}
+          />
           <span style={{ color: "var(--color-text-tertiary)" }}>—</span>
-          <input className="input" type="date" defaultValue={toInputDate(TODAY)} style={{ width: 170 }} />
+          <input
+            className="input"
+            type="date"
+            defaultValue={toInputDate(TODAY)}
+            style={{ width: 170 }}
+          />
           <div className="search-box">
             <Icon name="search" size={16} />
             <input
@@ -77,49 +69,48 @@ export default function History() {
               <th>Дата</th>
               <th>Комната</th>
               <th>Результат</th>
-              <th style={{ textAlign: "right" }}>Итог</th>
+              <th style={{ textAlign: "right" }}>Сумма</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((h) => (
-              <tr key={h.roundId}>
+            {rows.map((h, i) => (
+              <tr key={`${h.date}-${i}`}>
                 <td>{h.date}</td>
-                <td style={{ fontWeight: 600 }}>
-                  {h.roomTitle}{" "}
-                  <Link to={`/rooms/${h.roomId}`} style={{ color: "var(--color-text-tertiary)", fontSize: 12 }}>
-                    #{h.roomId}
-                  </Link>
-                </td>
+                <td style={{ fontWeight: 600 }}>{h.room}</td>
                 <td>
-                  {h.win ? <span className="tag-win">● Победа</span> : <span className="tag-lose">● Проигрыш</span>}
+                  {h.result === "win" ? (
+                    <span className="tag-win">● Выигрыш</span>
+                  ) : (
+                    <span className="tag-lose">● Проигрыш</span>
+                  )}
                 </td>
                 <td style={{ textAlign: "right" }}>
-                  <span className={h.amount >= 0 ? "plus" : "minus"}>{fmtSigned(h.amount)}</span>
+                  <span className={h.amount >= 0 ? "plus" : "minus"}>
+                    {h.amount >= 0 ? "+" : "−"}
+                    {Math.abs(h.amount).toLocaleString("ru-RU")}
+                  </span>
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={4} style={{ textAlign: "center", color: "var(--color-text-secondary)" }}>
-                  {loading ? "Загружаем…" : "Пока нет участий — сыграйте первый раунд"}
+                  Ничего не найдено
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        <div className="pager">
+          {[1, 2, 3, 4, 5].map((p) => (
+            <button key={p} className={`page-btn${p === 1 ? " active" : ""}`}>
+              {p}
+            </button>
+          ))}
+          <button className="page-btn">→</button>
+        </div>
       </div>
     </>
   );
-}
-
-function mapHistory(rows: {
-  roundId: number;
-  roomId: number;
-  roomTitle: string;
-  finishedAt: number;
-  win: boolean;
-  amount: number;
-  prize: number;
-}[]) {
-  return rows.map((r) => ({ ...r, date: fmtDateTime(r.finishedAt) }));
 }

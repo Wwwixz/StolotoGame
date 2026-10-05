@@ -1,46 +1,47 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import { RequireAdmin, RequireRole } from "./components/guards";
 import RoleSelect from "./pages/RoleSelect";
 import Lobby from "./pages/Lobby";
 import Games from "./pages/Games";
 import AutoMatch from "./pages/AutoMatch";
 import RoomDetail from "./pages/RoomDetail";
+import Waiting from "./pages/Waiting";
+import BotsFilling from "./pages/BotsFilling";
+import Draw from "./pages/Draw";
+import Winners from "./pages/Winners";
 import History from "./pages/History";
 import Balance from "./pages/Balance";
 import Profile from "./pages/Profile";
 import AdminConfigurator from "./pages/AdminConfigurator";
 import Economy from "./pages/Economy";
 import ExpertLog from "./pages/ExpertLog";
-import { ToastHost } from "./toast";
-import { useEffect } from "react";
-import { realtime } from "./realtime";
 
 export default function App() {
-  useEffect(() => {
-    realtime.connect();
-    return () => realtime.disconnect();
-  }, []);
-
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<RoleSelect />} />
+    <Routes>
+      <Route path="/" element={<RoleSelect />} />
+      <Route element={<RequireRole />}>
         <Route element={<Layout />}>
           <Route path="/lobby" element={<Lobby />} />
           <Route path="/games" element={<Games />} />
           <Route path="/auto-match" element={<AutoMatch />} />
-          {/* Живая комната: ожидание → боты → розыгрыш → победитель в одном экране */}
           <Route path="/rooms/:id" element={<RoomDetail />} />
+          <Route path="/rooms/:id/waiting" element={<Waiting />} />
+          <Route path="/rooms/:id/bots" element={<BotsFilling />} />
+          <Route path="/rooms/:id/draw" element={<Draw />} />
+          <Route path="/rooms/:id/winners" element={<Winners />} />
           <Route path="/history" element={<History />} />
           <Route path="/balance" element={<Balance />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<AdminConfigurator />} />
-          <Route path="/economy" element={<Economy />} />
-          <Route path="/log" element={<ExpertLog />} />
-          <Route path="*" element={<RoleSelect />} />
+          <Route element={<RequireAdmin />}>
+            <Route path="/admin" element={<AdminConfigurator />} />
+            <Route path="/economy" element={<Economy />} />
+            <Route path="/log" element={<ExpertLog />} />
+          </Route>
         </Route>
-      </Routes>
-      <ToastHost />
-    </>
+      </Route>
+      <Route path="*" element={<RoleSelect />} />
+    </Routes>
   );
 }

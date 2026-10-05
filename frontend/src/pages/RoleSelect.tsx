@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/ui";
-import { Logo } from "../components/graphics";
+import logoPng from "../assets/stoloto-logo.png";
 import { useRole } from "../role";
 
 export default function RoleSelect() {
@@ -16,7 +16,7 @@ export default function RoleSelect() {
     <div className="landing">
       <div className="landing-card">
         <div className="landing-logo">
-          <Logo />
+          <img className="logo-img" src={logoPng} alt="Столото — Государственные лотереи" />
         </div>
 
         <h1>Быстрые игровые комнаты</h1>
@@ -44,9 +44,7 @@ export default function RoleSelect() {
           </button>
         </div>
 
-        <span className="landing-foot">
-          Кубок России по продуктивному программированию · Java (Spring Boot) + React + PostgreSQL + Docker
-        </span>
+        <span className="landing-foot">Кубок России по продуктивному программированию · React + TypeScript</span>
       </div>
     </div>
   );
