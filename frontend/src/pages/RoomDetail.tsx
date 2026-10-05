@@ -1,501 +1,212 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, ApiErr } from "../api";
-import { useRoom } from "../hooks";
-import { usePlayer } from "../player";
-import { ballColor, fmt, fmtSigned, mmss, roomStyle, secondsLeft } from "../data";
-import type { RoomState, RoomSummary } from "../types";
-import { Avatar, BotAvatar, Coin, Icon, ProgressRing, Stat, YouBadge } from "../components/ui";
-import { WinnerTrophy } from "../components/graphics";
-import LottoDrum from "../components/LottoDrum";
-import { toast } from "../toast";
-
-const CONFETTI_COLORS = ["#e31e24", "#ffc400", "#3478f6", "#19a463", "#7b5cf0"];
-
-const STEPS = ["Проверка участников", "Расчёт весов", "RNG — выбор победителя", "Показ результата"];
+import { fmt, getRoom, mmss, pct, roomHumans, roomBots, winProb } from "../data";
+import { Avatar, BotAvatar, Coin, Icon } from "../components/ui";
+import RoomNotFound from "../components/RoomNotFound";
+import { useEconomy } from "../state/economy";
+import { GAMES } from "../games";
 
 export default function RoomDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { me, refresh } = usePlayer();
-  const [room, setRoom] = useRoom(id ?? "0");
-  const [alternatives, setAlternatives] = useState<RoomSummary[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [, setTick] = useState(0);
+  const room = getRoom(id);
+  const econ = useEconomy();
+  const [left, setLeft] = useState(45);
+  const boostActive = room ? econ.boost?.roomId === room.id : false;
 
-  // Локальный тик раз в секунду — таймеры и чек-лист анимации.
   useEffect(() => {
-    const t = window.setInterval(() => setTick((n) => n + 1), 1000);
+    const t = window.setInterval(() => setLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => window.clearInterval(t);
   }, []);
 
-  // Баланс меняется после розыгрыша — подтягиваем при смене фазы.
-  useEffect(() => {
-    if (room?.status === "FINISHED") refresh();
-  }, [room?.status, refresh]);
+  if (!room) return <RoomNotFound />;
 
-  const mySeat = useMemo(
-    () => room?.participants.find((p) => me && p.playerId === me.id) ?? null,
-    [room, me],
-  );
+  const game = GAMES[room.game];
+  const joined = roomHumans(room).length;
+  const canEnter = econ.balance >= room.price;
+  const canBoost = econ.balance >= room.boostPrice && !boostActive;
 
-  if (!room) {
-    return (
-      <div className="panel" style={{ textAlign: "center", padding: 60, color: "var(--color-text-secondary)" }}>
-        Загружаем комнату…
-      </div>
-    );
-  }
-
-  if (room.status === "CLOSED") {
-    return (
-      <div className="panel" style={{ textAlign: "center", padding: 60 }}>
-        <h3>Комната закрыта администратором</h3>
-        <p style={{ color: "var(--color-text-secondary)", margin: "10px 0 20px" }}>
-          Резерв забронированных баллов возвращён участникам.
-        </p>
-        <Link to="/lobby" className="btn btn-red">
-          В лобби
-        </Link>
-      </div>
-    );
-  }
-
-  const style = roomStyle(room.id);
-  const left = secondsLeft(room.phaseEndsAt, room.serverTime);
-
-  const join = async () => {
-    if (!me) return;
-    setBusy(true);
-    try {
-      setRoom(await api.join(room.id, me.id));
-      toast(`Вы в комнате! ${fmt(room.price)} баллов зарезервировано`, "success");
-      setAlternatives([]);
-    } catch (e) {
-      if (e instanceof ApiErr) {
-        toast(e.message, "error");
-        if (e.alternatives.length > 0) setAlternatives(e.alternatives);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const buyBoost = async () => {
-    if (!me) return;
-    try {
-      setRoom(await api.boost(room.id, me.id));
-      toast(`Буст активирован: +${room.boostPercent}% к весу в розыгрыше`, "success");
-    } catch (e) {
-      toast(e instanceof ApiErr ? e.message : "Не удалось купить буст", "error");
-    }
-  };
-
-  const leave = async () => {
-    if (!me) return;
-    try {
-      setRoom(await api.leave(room.id, me.id));
-      toast("Вы вышли из комнаты, резерв возвращён", "info");
-    } catch (e) {
-      toast(e instanceof ApiErr ? e.message : "Не удалось выйти", "error");
-    }
-  };
-
-  /* ---------- фаза: ожидание ---------- */
-  if (room.status === "OPEN") {
-    const joined = mySeat != null;
-    const free = room.seats - room.occupied;
-    const myWeight = mySeat?.weight ?? 1;
-    const totalWeight = room.participants.reduce((s, p) => s + p.weight, 0) || 1;
-    const baseProb = joined ? (myWeight / totalWeight) * 100 : (100 / room.seats);
-    const boostedProb = joined
-      ? ((mySeat!.boost ? myWeight : 1 * (1 + room.boostPercent / 100)) / (totalWeight + (mySeat!.boost ? 0 : (room.boostPercent / 100)))) * 100
-      : (100 / room.seats) * (1 + room.boostPercent / 100);
-
-    return (
-      <>
-        <h1 className="page-title">
-          <Link to="/games" style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>←</Link>
-          Комната #{room.id} «{room.title}»
-          <span className="badge blue">Ожидание игроков</span>
-        </h1>
-
-        <div className="stat-row" style={{ marginBottom: 16 }}>
-          <Stat icon={<Icon name="users" />} value={`${room.occupied}/${room.seats}`} label="мест занято" />
-          <Stat icon={<Icon name="zap" />} value={fmt(room.price)} label="цена входа" tone="red" />
-          <Stat icon={<Coin />} value={fmt(room.projectedFund)} label="призовой фонд" tone="gold" />
-          <Stat icon={<Icon name="percent" />} value={`${room.fundPercent}%`} label="в фонд" tone="red" />
+  return (
+    <div className="two-col">
+      <div className="panel">
+        <div className="room-head">
+          <h2>{room.name}</h2>
+          <span className="badge yellow">{game.label}</span>
+          {room.popular && <span className="badge red">Популярная</span>}
+          {room.fastDraw && <span className="badge blue">Быстрый розыгрыш</span>}
         </div>
 
-        <div className="two-col">
-          <div>
-            <div className="panel" style={{ textAlign: "center", padding: "30px 20px" }}>
-              {room.phaseEndsAt ? (
-                <ProgressRing value={left / Math.max(1, room.waitSeconds)} stroke={16} size={190}>
-                  <span className="lbl">До старта</span>
-                  <br />
-                  <span className="val">{mmss(left)}</span>
-                </ProgressRing>
-              ) : (
-                <div style={{ padding: "40px 0" }}>
-                  <div style={{ fontSize: 52, marginBottom: 10 }}>⏳</div>
-                  <b>Ждём первого игрока</b>
-                  <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 6 }}>
-                    Таймер на {mmss(room.waitSeconds)} стартует, когда в комнате появится первый участник
-                  </p>
-                </div>
-              )}
-            </div>
+        <div className="room-stats">
+          <div className="stat-inline">
+            <span className="stat-ico red">
+              <Icon name="users" size={18} />
+            </span>
+            <span>
+              <div className="num">{room.places}</div>
+              <div className="lbl">мест</div>
+            </span>
+          </div>
+          <div className="stat-inline">
+            <span className="stat-ico red">
+              <Icon name="zap" size={18} />
+            </span>
+            <span>
+              <div className="num">{room.price}</div>
+              <div className="lbl">цена входа</div>
+            </span>
+          </div>
+          <div className="stat-inline">
+            <span className="stat-ico gold">
+              <Coin />
+            </span>
+            <span>
+              <div className="num">{fmt(room.prizePool)}</div>
+              <div className="lbl">призовой фонд</div>
+            </span>
+          </div>
+          <div className="stat-inline">
+            <span className="stat-ico red">
+              <Icon name="percent" size={18} />
+            </span>
+            <span>
+              <div className="num">{room.fundPercent}%</div>
+              <div className="lbl">в фонд</div>
+            </span>
+          </div>
+        </div>
 
-            <div className="panel" style={{ marginTop: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                <h3 style={{ margin: 0 }}>Состав комнаты</h3>
-                <b>{room.occupied}/{room.seats}</b>
-              </div>
-              <div className="avatar-row">
-                {room.participants.map((p) =>
-                  p.bot ? (
-                    <BotAvatar key={p.id} size="md" caption />
-                  ) : (
-                    <Avatar key={p.id} name={p.name} size="md" you={p.playerId === me?.id} />
-                  ),
-                )}
-                {Array.from({ length: free }).map((_, i) => (
-                  <Avatar key={`e${i}`} name="empty" size="md" empty label={String(room.occupied + i + 1)} />
-                ))}
-              </div>
+        <p style={{ color: "var(--color-text-secondary)", lineHeight: 1.6, fontSize: 14 }}>
+          {game.description} {room.description}
+        </p>
 
-              {joined && (
-                <div className="note" style={{ marginTop: 16, justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--color-text-secondary)" }}>
-                    Баллы в резерве до конца раунда
-                  </span>
-                  <button className="link-btn" style={{ color: "var(--color-red)" }} onClick={leave}>
-                    Выйти из комнаты (вернём {fmt(room.price)})
-                  </button>
-                </div>
-              )}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            margin: "20px 0 12px",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: 15 }}>Состав комнаты</h3>
+          <b>
+            {joined}/{room.places}
+          </b>
+        </div>
+        <div className="avatar-row">
+          {roomHumans(room).map((p) => (
+            <Avatar key={p.name} name={p.name} size="md" you={p.you} />
+          ))}
+          {Array.from({ length: room.places - joined }).map((_, i) => (
+            <Avatar key={`e${i}`} name="empty" size="md" empty label={String(joined + i + 1)} />
+          ))}
+        </div>
+        <div className="note" style={{ marginTop: 10 }}>
+          После таймера свободные места ({roomBots(room).length}) заполнят боты
+        </div>
+
+        <div className="prob-cards">
+          <div className="prob">
+            <div className="lbl">Ваша вероятность победы</div>
+            <div className="val">{pct(winProb(room, false))}</div>
+          </div>
+          <div className="prob">
+            <div className="lbl">С бустом (+{room.boostPercent}% к весу)</div>
+            <div className="val" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span className="up">↗ {pct(winProb(room, true))}</span>
+              <span style={{ color: "var(--color-orange)", display: "inline-flex" }}>
+                <Icon name="up" size={20} />
+              </span>
             </div>
           </div>
+        </div>
 
-          <div className="aside-stack">
-            {joined && (
-              <div className="prob-cards" style={{ display: "grid", gap: 12 }}>
-                <div className="prob">
-                  <div className="lbl">Ваша вероятность победы</div>
-                  <div className="val">{baseProb.toFixed(1).replace(".", ",")}%</div>
-                </div>
-                <div className="prob">
-                  <div className="lbl">С бустом</div>
-                  <div className="val" style={{ color: "var(--color-green-text)" }}>
-                    ↗ {Math.min(100, boostedProb).toFixed(1).replace(".", ",")}%
-                  </div>
-                </div>
-              </div>
-            )}
+        {!canEnter && (
+          <div className="warn" style={{ marginTop: 16 }}>
+            <b>
+              <Icon name="warn" size={18} />
+              Недостаточно баллов
+            </b>
+            Для входа нужно {room.price}, у вас {fmt(econ.balance)}.{" "}
+            <Link to="/auto-match" style={{ fontWeight: 700 }}>
+              Подобрать комнату под ваш баланс →
+            </Link>
+          </div>
+        )}
 
-            <div className="aside-card">
-              <span className="ico" style={{ background: "var(--color-red-light)", color: "var(--color-red)" }}>
-                <Icon name="zap" size={20} />
-              </span>
-              <h4>Буст</h4>
-              <div className="sub">
-                {room.boostEnabled
-                  ? `+${room.boostPercent}% к весу при выборе победителя`
-                  : "В этой комнате буст не предусмотрен"}
-              </div>
-              {room.boostEnabled && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                  <span className="price-tag">Цена: {room.boostPrice}</span>
-                  {mySeat?.boost ? (
-                    <span className="tag-win">● Активирован</span>
-                  ) : joined ? (
-                    <button
-                      className="btn btn-red"
-                      style={{ height: 36, padding: "0 14px", fontSize: 13 }}
-                      onClick={buyBoost}
-                    >
-                      Взять буст
-                    </button>
-                  ) : (
-                    <span className="sub">после входа</span>
-                  )}
-                </div>
-              )}
-            </div>
+        <button
+          className="btn btn-red btn-lg btn-block"
+          style={{ marginTop: 22 }}
+          disabled={!canEnter}
+          onClick={() => navigate(`/rooms/${room.id}/waiting`)}
+        >
+          Войти в комнату
+        </button>
+      </div>
 
-            <div className="aside-card">
-              <span className="ico" style={{ background: "var(--color-blue-light)" }}>
-                <BotAvatar size="md" />
-              </span>
-              <h4>Боты</h4>
-              <div className="sub">{free > 0 ? `${free} своб. мест(а)` : "все места заняты"}</div>
-              <div className="sub">Заполнят комнату после таймера</div>
-            </div>
-
-            {!joined && (
+      <div className="aside-stack">
+        <div className="aside-card">
+          <span
+            className="ico"
+            style={{ background: "var(--color-red-light)", color: "var(--color-red)" }}
+          >
+            <Icon name="zap" size={20} />
+          </span>
+          <h4>Буст</h4>
+          <div className="sub">+{room.boostPercent}% к весу при выборе победителя</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span className="price-tag">Цена: {room.boostPrice}</span>
+            {boostActive ? (
               <button
-                className="btn btn-red btn-lg btn-block"
-                onClick={join}
-                disabled={busy || !me}
+                className="btn btn-ghost"
+                style={{ height: 36, padding: "0 14px", fontSize: 13 }}
+                onClick={() => econ.cancelBoost()}
               >
-                Войти в комнату за {fmt(room.price)} баллов
+                Отменить
+              </button>
+            ) : (
+              <button
+                className="btn btn-red"
+                style={{ height: 36, padding: "0 14px", fontSize: 13 }}
+                disabled={!canBoost}
+                onClick={() => econ.buyBoost(room)}
+              >
+                Взять буст
               </button>
             )}
           </div>
+          {boostActive ? (
+            <div style={{ marginTop: 10 }}>
+              <span className="tag-win">● Активирован — +{room.boostPercent}% к весу</span>
+            </div>
+          ) : !canBoost && econ.balance < room.boostPrice ? (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#c91c25", fontWeight: 600 }}>
+              Недостаточно баллов для буста
+            </div>
+          ) : null}
         </div>
 
-        {alternatives.length > 0 && (
-          <div className="panel" style={{ marginTop: 16 }}>
-            <h3>Не хватило баллов? Попробуйте эти комнаты</h3>
-            <div className="grid-cards">
-              {alternatives.map((r) => (
-                <div key={r.id} className="alt-room">
-                  <span className={`hex hex-${roomStyle(r.id).hex}`}>
-                    <Icon name={roomStyle(r.id).icon} size={18} />
-                  </span>
-                  <b>{r.title}</b>
-                  <span className="sub">
-                    {r.seats} мест · {r.price} баллов · фонд {fmt(r.projectedFund)}
-                  </span>
-                  <button className="btn btn-ghost" onClick={() => navigate(`/rooms/${r.id}`)}>
-                    Открыть
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  /* ---------- фаза: розыгрыш ---------- */
-  if (room.status === "RUNNING") {
-    const total = 8; // game.draw-seconds
-    const elapsed = Math.max(0, total - left);
-    const doneSteps = Math.min(STEPS.length, Math.ceil((elapsed / total) * STEPS.length + 0.34));
-
-    return (
-      <>
-        <h1 className="page-title">
-          Комната #{room.id} «{room.title}»
-          <span className="badge red">Розыгрыш начался</span>
-        </h1>
-
-        <div className="stat-row" style={{ marginBottom: 16 }}>
-          <Stat icon={<Icon name="users" />} value={`${room.occupied}/${room.seats}`} label="мест занято" />
-          <Stat icon={<Icon name="zap" />} value={fmt(room.price)} label="цена входа" tone="red" />
-          <Stat icon={<Coin />} value={fmt(room.currentFund)} label="призовой фонд" tone="gold" />
-          <Stat icon={<Icon name="percent" />} value={`${room.fundPercent}%`} label="в фонд" tone="red" />
-        </div>
-
-        <div className="two-col">
-          <div className="panel" style={{ textAlign: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <h3 style={{ margin: 0 }}>Розыгрыш</h3>
-              <span className="live-badge">
-                <i />
-                LIVE
-              </span>
-            </div>
-            <div className="drum-wrap" style={{ marginTop: 10 }}>
-              <LottoDrum
-                balls={room.participants.map((p) => ({
-                  seat: p.seat,
-                  boost: p.boost,
-                  bot: p.bot,
-                }))}
-                winnerSeat={null}
-                reveal={false}
-                size={360}
-              />
-            </div>
-            <div style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 8 }}>
-              Определяем победителя… результат уже рассчитан backend-логикой
-            </div>
-          </div>
-
-          <div className="panel">
-            <h3>Текущий ход</h3>
-            <div className="steps">
-              {STEPS.map((s, i) => (
-                <div key={s} className={`step${i < doneSteps ? " done" : ""}`}>
-                  <span className="ok">
-                    <Icon name="check" size={18} />
-                  </span>
-                  {s}
-                </div>
-              ))}
-            </div>
-
-            <h3 style={{ marginTop: 18 }}>Участники и веса</h3>
-            <div className="weight-list">
-              {room.participants.map((p) => (
-                <div key={p.id} className="weight-row">
-                  <span className="mini-ball" style={{ background: ballColor(p.seat) }}>
-                    {p.seat}
-                  </span>
-                  <span className="name">
-                    {p.name}
-                    {p.playerId === me?.id && <YouBadge />}
-                  </span>
-                  {p.boost && <span className="tag-warn">⚡ буст</span>}
-                  <b>×{p.weight.toFixed(2).replace(".", ",")}</b>
-                </div>
-              ))}
-            </div>
-            <div className="note" style={{ marginTop: 10 }}>
-              Победителя выбирает ГСЧ на backend с учётом веса каждого места — оболочка только
-              транслирует результат
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  /* ---------- фаза: результаты ---------- */
-  const hero = room.winnerName;
-  const iWon = room.winnerPlayerId != null && me != null && room.winnerPlayerId === me.id;
-  const winnerSeat = room.participants.find((p) => p.name === hero)?.seat ?? null;
-  const myNet = mySeat ? (iWon ? (room.payout ?? 0) - room.price : -room.price) : 0;
-
-  const confetti = Array.from({ length: 36 }).map((_, i) => ({
-    left: (i * 37) % 100,
-    delay: (i % 12) * 0.35,
-    dur: 2.6 + ((i * 7) % 20) / 10,
-    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-    rot: (i * 53) % 360,
-  }));
-
-  return (
-    <>
-      <h1 className="page-title">
-        Комната #{room.id} «{room.title}»
-        <span className="badge green">Раунд завершён</span>
-      </h1>
-
-      <section className="winners-hero">
-        <div className="confetti">
-          {confetti.map((c, i) => (
-            <i
-              key={i}
-              style={{
-                left: `${c.left}%`,
-                background: c.color,
-                animationDelay: `${c.delay}s`,
-                animationDuration: `${c.dur}s`,
-                transform: `rotate(${c.rot}deg)`,
-              }}
-            />
-          ))}
-        </div>
-
-        <WinnerTrophy size={104} />
-        <h2>{iWon ? "Вы победили!" : "Победитель определён"}</h2>
-
-        <div className="hero-winner">
-          <span className="medal gold">
-            {winnerSeat ?? <Icon name="trophy" size={20} />}
+        <div className="aside-card">
+          <span className="ico" style={{ background: "var(--color-blue-light)" }}>
+            <BotAvatar size="md" />
           </span>
-          <Avatar name={hero ?? "—"} size="md" bot={room.winnerIsBot} you={iWon} />
-          <span>
-            <span className="name">
-              {hero}
-              {iWon && <YouBadge />}
-            </span>
-            <br />
-            <span className="sub">
-              Выигрыш: {fmt(room.payout ?? 0)} баллов {room.winnerIsBot && "(бот — приз остаётся в системе)"}
-            </span>
+          <h4>Боты</h4>
+          <div className="sub">{room.places - joined} места</div>
+          <div className="sub">Заполнят комнату через</div>
+          <div className="big">{mmss(left)}</div>
+        </div>
+
+        <div className="aside-card">
+          <span
+            className="ico"
+            style={{ background: "var(--color-red-light)", color: "var(--color-red)" }}
+          >
+            <Icon name="timer" size={20} />
           </span>
-        </div>
-
-        {mySeat && (
-          <div className={`note ${iWon ? "win" : ""}`} style={{ marginTop: 14 }}>
-            Ваш итог раунда:{" "}
-            <b className={iWon ? "plus" : "minus"}>{fmtSigned(myNet)}</b>{" "}
-            (вход {fmt(room.price)}
-            {iWon ? ` + приз ${fmt(room.payout ?? 0)}` : ""})
-          </div>
-        )}
-      </section>
-
-      <div className="two-col" style={{ marginTop: 16 }}>
-        <div className="panel">
-          <h3>Результаты раунда</h3>
-          <div className="winner-list" style={{ maxWidth: "none" }}>
-            {room.participants.map((p) => (
-              <div key={p.id} className={`winner-row${p.name === hero ? " first" : ""}`}>
-                <span className={`medal ${p.name === hero ? "gold" : "plain"}`}>
-                  <span className="mini-ball" style={{ background: ballColor(p.seat) }}>
-                    {p.seat}
-                  </span>
-                </span>
-                <Avatar name={p.name} size="sm" bot={p.bot} you={p.playerId === me?.id} />
-                <span>
-                  <span className="name">
-                    {p.name}
-                    {p.playerId === me?.id && <YouBadge />}
-                  </span>
-                  <br />
-                  <span className="sub">вес ×{p.weight.toFixed(2).replace(".", ",")}</span>
-                </span>
-                <span className="prize">
-                  {p.name === hero ? `+${fmt(room.payout ?? 0)}` : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="aside-stack">
-          <div className="panel">
-            <h3>Комбинация раунда</h3>
-            <div className="avatar-row">
-              {(room.combination.length ? room.combination : []).map((n) => (
-                <span key={n} className="ball">
-                  {n}
-                </span>
-              ))}
-              {winnerSeat != null && (
-                <span className="ball" style={{ background: ballColor(winnerSeat), color: "#fff" }}>
-                  {winnerSeat}
-                </span>
-              )}
-            </div>
-            <div className="note" style={{ marginTop: 10 }}>
-              Победный шар выделен цветом участника
-            </div>
-          </div>
-
-          {room.seed && (
-            <div className="panel">
-              <h3>Проверяемость результата</h3>
-              <div className="kv">
-                <span className="k">Seed раунда</span>
-                <span className="v seed">{room.seed}</span>
-              </div>
-              <div className="note" style={{ marginTop: 10 }}>
-                Полный разбор ГСЧ и весов —{" "}
-                <Link to="/log" style={{ color: "var(--color-red)", fontWeight: 600 }}>
-                  в журнале раундов
-                </Link>
-              </div>
-            </div>
-          )}
-
-          <div className="btn-row" style={{ marginTop: 0 }}>
-            <button className="btn btn-red" style={{ flex: 1 }} onClick={() => navigate("/auto-match")}>
-              Сыграть ещё
-            </button>
-            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => navigate("/lobby")}>
-              В лобби
-            </button>
-          </div>
+          <h4>Таймер</h4>
+          <div className="sub">До старта:</div>
+          <div className="big">{mmss(left)}</div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

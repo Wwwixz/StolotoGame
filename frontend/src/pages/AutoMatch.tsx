@@ -1,56 +1,52 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { api, ApiErr } from "../api";
-import { fmt } from "../data";
-import type { MatchResponse } from "../types";
+import { Link, useLocation } from "react-router-dom";
+import { fmt, pct, winProb, ROOMS } from "../data";
+import type { Room } from "../types";
 import { Icon } from "../components/ui";
 import RoomCard from "../components/RoomCard";
-import { toast } from "../toast";
-import { usePlayer } from "../player";
+import { GAME_LIST } from "../games";
 
-const PLACES = [0, 2, 5, 10];
+const PLACES = [5, 6, 8, 10];
 
 export default function AutoMatch() {
-  const navigate = useNavigate();
-  const { me } = usePlayer();
+  const location = useLocation();
+  const preset = (location.state ?? {}) as {
+    places?: number;
+    priceMin?: number;
+    priceMax?: number;
+    fund?: number;
+  };
+
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [places, setPlaces] = useState(0);
-  const [priceMin, setPriceMin] = useState(50);
-  const [priceMax, setPriceMax] = useState(500);
-  const [fund, setFund] = useState(0);
-  const [needBoost, setNeedBoost] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<MatchResponse | null>(null);
+  const [places, setPlaces] = useState<number>(preset.places ?? 10);
+  const [priceMin, setPriceMin] = useState<number>(preset.priceMin ?? 50);
+  const [priceMax, setPriceMax] = useState<number>(preset.priceMax ?? 500);
+  const [fund, setFund] = useState<number>(preset.fund ?? 1000);
+  const [game, setGame] = useState<string>("any");
+  const [results, setResults] = useState<{ exact: boolean; rooms: Room[] } | null>(null);
 
-  const find = async () => {
-    if (!me) return;
-    setBusy(true);
-    try {
-      const resp = await api.matchmake({
-        playerId: me.id,
-        seats: places,
-        priceMin,
-        priceMax,
-        minFundPercent: fund > 0 ? fund : null,
-        needBoost,
-      });
-      setResults(resp);
-      toast(resp.message, resp.created ? "success" : "info");
-      window.setTimeout(
-        () => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        60,
-      );
-    } catch (e) {
-      toast(e instanceof ApiErr ? e.message : "Не удалось выполнить подбор", "error");
-    } finally {
-      setBusy(false);
-    }
+  const find = () => {
+    const byCloseness = (a: Room, b: Room) =>
+      Math.abs(a.places - places) - Math.abs(b.places - places);
+
+    const matched = ROOMS.filter((r) => r.price >= priceMin && r.price <= priceMax)
+      .filter((r) => r.prizePool >= fund)
+      .filter((r) => game === "any" || r.game === game)
+      .sort(byCloseness);
+
+    const exact = matched.length > 0;
+    const rooms = exact
+      ? matched
+      : [...ROOMS].sort((a, b) => b.prizePool - a.prizePool).sort(byCloseness);
+
+    setResults({ exact, rooms });
+    window.setTimeout(
+      () => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      60,
+    );
   };
 
-  const forecastFor = (seats: number, boostPercent: number) => {
-    const base = 100 / Math.max(2, seats);
-    return `${(base * (1 + boostPercent / 100)).toFixed(1).replace(".", ",")}%`;
-  };
+  const forecastFor = (r: Room) => pct(winProb(r, true));
 
   return (
     <>
@@ -75,7 +71,7 @@ export default function AutoMatch() {
                   className={`chip${places === p ? " active" : ""}`}
                   onClick={() => setPlaces(p)}
                 >
-                  {p === 0 ? "Любое" : p}
+                  {p}
                 </button>
               ))}
             </div>
@@ -87,9 +83,9 @@ export default function AutoMatch() {
               <span className="range-val">{priceMin}</span>
               <input
                 type="range"
-                min={10}
+                min={50}
                 max={500}
-                step={10}
+                step={50}
                 value={priceMin}
                 onChange={(e) => setPriceMin(Math.min(Number(e.target.value), priceMax))}
               />
@@ -98,9 +94,9 @@ export default function AutoMatch() {
               <span className="range-val">{priceMax}</span>
               <input
                 type="range"
-                min={10}
+                min={50}
                 max={500}
-                step={10}
+                step={50}
                 value={priceMax}
                 onChange={(e) => setPriceMax(Math.max(Number(e.target.value), priceMin))}
               />
@@ -108,30 +104,43 @@ export default function AutoMatch() {
           </div>
 
           <div className="field">
-            <label>Минимальный процент фонда</label>
+            <label>Призовой фонд (от)</label>
             <div className="range-wrap">
-              <span className="range-val">{fund === 0 ? "Любой" : `от ${fund}%`}</span>
+              <span className="range-val">{fmt(fund)}</span>
               <input
                 type="range"
-                min={0}
-                max={95}
-                step={5}
+                min={1000}
+                max={42000}
+                step={500}
                 value={fund}
                 onChange={(e) => setFund(Number(e.target.value))}
               />
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "6px 0 18px" }}>
-            <button
-              className={`toggle${needBoost ? " on" : ""}`}
-              onClick={() => setNeedBoost((v) => !v)}
-            />
-            <b style={{ fontSize: 14 }}>Нужна комната с бустом</b>
+          <div className="field">
+            <label>Формат игры</label>
+            <div className="chips">
+              <button
+                className={`chip${game === "any" ? " active" : ""}`}
+                onClick={() => setGame("any")}
+              >
+                Любой
+              </button>
+              {GAME_LIST.map((g) => (
+                <button
+                  key={g.type}
+                  className={`chip${game === g.type ? " active" : ""}`}
+                  onClick={() => setGame(g.type)}
+                >
+                  {g.short}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <button className="btn btn-red btn-block btn-lg" onClick={find} disabled={busy || !me}>
-            {busy ? "Подбираем…" : "Найти комнату"}
+          <button className="btn btn-red btn-block btn-lg" onClick={find}>
+            Найти комнату
           </button>
         </div>
 
@@ -162,7 +171,7 @@ export default function AutoMatch() {
               <span className="ok">
                 <Icon name="check" size={20} />
               </span>
-              Если комнат нет — мгновенно создадим новую
+              Покажем прогноз выигрыша
             </div>
           </div>
           <div
@@ -184,24 +193,19 @@ export default function AutoMatch() {
       {results && (
         <div ref={resultsRef} style={{ marginTop: 28 }}>
           <div className="section-head">
-            <h3>{results.created ? "Создали комнату под ваш запрос" : `Найденные комнаты (${results.rooms.length})`}</h3>
+            <h3>
+              {results.exact
+                ? `Найденные комнаты (${results.rooms.length})`
+                : "Точных совпадений нет — вот ближайшие"}
+            </h3>
             <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-              {places === 0 ? "любое число мест" : `${places} мест`} · вход {priceMin}–{priceMax} баллов
-              {fund > 0 ? ` · фонд от ${fund}%` : ""}
+              по {places} местам · вход {priceMin}–{priceMax} баллов · фонд от {fmt(fund)}
             </span>
           </div>
           <div className="grid-cards">
             {results.rooms.map((r) => (
-              <RoomCard key={r.id} room={r} forecast={forecastFor(r.seats, r.boostPercent)} />
+              <RoomCard key={r.id} room={r} forecast={forecastFor(r)} />
             ))}
-          </div>
-          <div className="btn-row" style={{ marginTop: 16 }}>
-            <button className="btn btn-ghost" onClick={() => navigate("/games")}>
-              Посмотреть все комнаты
-            </button>
-            <Link className="btn btn-ghost" to={`/rooms/${results.rooms[0].id}`}>
-              Открыть первую →
-            </Link>
           </div>
         </div>
       )}

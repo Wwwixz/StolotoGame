@@ -1,84 +1,57 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
-import { usePlayer } from "../player";
-import { fmt, fmtSigned, fmtDateTime } from "../data";
-import type { HistoryRow } from "../types";
+import { CURRENT_USER, fmt } from "../data";
+import { useEconomy } from "../state/economy";
 import { Avatar, Coin, Icon, Stat, YouBadge } from "../components/ui";
 
 const ACHIEVEMENTS = [
-  { icon: "trophy", title: "Первая победа", desc: "Выиграй первый раунд", need: (s: Stats) => s.wins >= 1 },
-  { icon: "zap", title: "Разогрев", desc: "Сыграй 3 раунда", need: (s: Stats) => s.games >= 3 },
-  { icon: "flame", title: "Регуляр", desc: "Сыграй 10 раундов", need: (s: Stats) => s.games >= 10 },
-  { icon: "bot", title: "Не боимся ботов", desc: "Победи в комнате с ботами", need: () => false },
-  { icon: "crown", title: "VIP-победа", desc: "Выиграй при входе от 200 баллов", need: (s: Stats) => s.bigWin },
-  { icon: "star", title: "Крупный куш", desc: "Выиграй 1000+ баллов", need: (s: Stats) => s.bigPrize },
+  { icon: "trophy", title: "Первая победа", desc: "Выиграй первый раунд", unlocked: true },
+  { icon: "zap", title: "10 игр", desc: "Сыграй 10 раундов", unlocked: true },
+  { icon: "flame", title: "Премиум игрок", desc: "Победа в «Премиуме»", unlocked: true },
+  { icon: "bot", title: "Не боимся ботов", desc: "Обыграй бота в раунде", unlocked: true },
+  { icon: "crown", title: "VIP-победа", desc: "Выиграй в VIP-комнате", unlocked: false },
+  { icon: "star", title: "Серия из 3 побед", desc: "Три победы подряд", unlocked: false },
 ] as const;
 
-interface Stats {
-  games: number;
-  wins: number;
-  winrate: number;
-  turnover: number;
-  bigWin: boolean;
-  bigPrize: boolean;
-}
-
 export default function Profile() {
-  const { me } = usePlayer();
-  const [rows, setRows] = useState<HistoryRow[]>([]);
-
-  useEffect(() => {
-    if (!me) return;
-    api.history(me.id).then(setRows).catch(() => undefined);
-  }, [me?.id, me?.balance]);
-
-  const stats: Stats = useMemo(() => {
-    const wins = rows.filter((r) => r.win);
-    return {
-      games: rows.length,
-      wins: wins.length,
-      winrate: rows.length ? (wins.length / rows.length) * 100 : 0,
-      turnover: rows.reduce((s, r) => s + r.amount, 0),
-      bigWin: wins.some((r) => r.prize >= 1000),
-      bigPrize: wins.some((r) => r.prize >= 1000),
-    };
-  }, [rows]);
-
-  if (!me) return null;
-  const levelProgress = Math.min(100, Math.round((stats.games % 10) * 10) || (stats.games ? 100 : 0));
+  const { balance, reserve, history } = useEconomy();
+  const lastGames = history.slice(0, 4);
+  const wins = history.filter((h) => h.result === "win").length;
 
   return (
     <>
       <h1 className="page-title">Профиль</h1>
 
       <div className="panel profile-head">
-        <Avatar name={me.name} size="xl" you />
+        <Avatar name="АК" size="xl" />
         <div className="profile-id">
           <div className="profile-name">
-            {me.name} <YouBadge />
+            {CURRENT_USER} <YouBadge />
           </div>
-          <div className="profile-sub">VIP-статус: {me.vipStatus} · тестовый пользователь MVP</div>
+          <div className="profile-sub">Участник хакатона · с 2025 года</div>
         </div>
         <div className="profile-chips">
           <span className="balance-chip">
             <Coin />
-            {fmt(me.balance)}
+            {fmt(balance)}
           </span>
           <span className="balance-chip">
             <Coin blue />
-            {fmt(me.reserved)}
+            {fmt(reserve)}
           </span>
         </div>
       </div>
 
       <div className="stat-row" style={{ margin: "16px 0" }}>
-        <Stat icon={<Coin />} value={fmt(me.balance)} label="баланс" tone="gold" />
-        <Stat icon={<Icon name="users" />} value={String(stats.games)} label="игр сыграно" />
-        <Stat icon={<Icon name="trophy" />} value={String(stats.wins)} label="побед" tone="green" />
+        <Stat icon={<Coin />} value={fmt(balance)} label="баланс" tone="gold" />
+        <Stat icon={<Icon name="users" />} value={String(history.length)} label="игр сыграно" />
+        <Stat icon={<Icon name="trophy" />} value={String(wins)} label="побед" tone="green" />
         <Stat
           icon={<Icon name="percent" />}
-          value={`${stats.winrate.toFixed(1).replace(".", ",")}%`}
+          value={
+            history.length > 0
+              ? `${((wins / history.length) * 100).toFixed(1).replace(".", ",")}%`
+              : "—"
+          }
           label="винрейт"
           tone="blue"
         />
@@ -100,51 +73,47 @@ export default function Profile() {
             </Link>
           </div>
 
-          {rows.slice(0, 4).map((h) => (
-            <div className="tx-row" key={h.roundId}>
-              {h.win ? <span className="tag-win">● Победа</span> : <span className="tag-lose">● Проигрыш</span>}
+          {lastGames.map((h, i) => (
+            <div className="tx-row" key={i}>
+              {h.result === "win" ? (
+                <span className="tag-win">● Выигрыш</span>
+              ) : (
+                <span className="tag-lose">● Проигрыш</span>
+              )}
               <span>
-                <span className="name">{h.roomTitle}</span>
+                <span className="name">{h.room}</span>
                 <br />
-                <span className="date">{fmtDateTime(h.finishedAt)}</span>
+                <span className="date">{h.date}</span>
               </span>
-              <span className={`amt ${h.amount >= 0 ? "plus" : "minus"}`}>{fmtSigned(h.amount)}</span>
+              <span className={`amt ${h.amount >= 0 ? "plus" : "minus"}`}>
+                {h.amount >= 0 ? "+" : "−"}
+                {fmt(Math.abs(h.amount))}
+              </span>
             </div>
           ))}
-
-          {rows.length === 0 && (
-            <div style={{ color: "var(--color-text-secondary)", textAlign: "center", padding: 16 }}>
-              Ещё нет участий в раундах
-            </div>
-          )}
         </div>
 
         <div className="panel">
           <h3>Достижения</h3>
           <div className="ach-grid">
-            {ACHIEVEMENTS.map((a) => {
-              const unlocked = a.need(stats);
-              return (
-                <div key={a.title} className={`ach${unlocked ? "" : " locked"}`}>
-                  <span className="ach-ico">
-                    <Icon name={a.icon} size={16} />
-                  </span>
-                  <span className="txt">
-                    <b>{a.title}</b>
-                    <span>{a.desc}</span>
-                  </span>
-                </div>
-              );
-            })}
+            {ACHIEVEMENTS.map((a) => (
+              <div key={a.title} className={`ach${a.unlocked ? "" : " locked"}`}>
+                <span className="ach-ico">
+                  <Icon name={a.icon} size={16} />
+                </span>
+                <span className="txt">
+                  <b>{a.title}</b>
+                  <span>{a.desc}</span>
+                </span>
+              </div>
+            ))}
           </div>
 
-          <h3 style={{ marginTop: 20 }}>Уровень {Math.floor(stats.games / 10) + 1} · Игрок</h3>
+          <h3 style={{ marginTop: 20 }}>Уровень 3 · Игрок</h3>
           <div className="progress">
-            <div className="fill" style={{ width: `${levelProgress}%` }} />
+            <div className="fill" style={{ width: "75%" }} />
           </div>
-          <div className="note">
-            {stats.games % 10} из 10 раундов до следующего уровня
-          </div>
+          <div className="note">9 из 12 побед до следующего уровня</div>
         </div>
       </div>
     </>

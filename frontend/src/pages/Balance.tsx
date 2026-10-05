@@ -1,33 +1,21 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
-import { usePlayer } from "../player";
-import { fmt, fmtSigned, fmtDateTime } from "../data";
-import type { SystemStats, TxRow } from "../types";
+import { useEconomy } from "../state/economy";
+import { fmt } from "../data";
 import { Coin, Icon } from "../components/ui";
 
-const TX_META: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
-  RESERVE: { icon: "users", tone: "tx-ico" },
-  REFUND: { icon: "wallet", tone: "tx-ico" },
-  BOOST: { icon: "zap", tone: "tx-ico gold" },
-  WIN: { icon: "trophy", tone: "tx-ico green" },
+const TX_ICON: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
+  Вход: { icon: "users", tone: "tx-ico" },
+  Выигрыш: { icon: "trophy", tone: "tx-ico green" },
+  Резерв: { icon: "wallet", tone: "tx-ico" },
+  Буст: { icon: "zap", tone: "tx-ico gold" },
 };
 
+function txMeta(title: string) {
+  const key = Object.keys(TX_ICON).find((k) => title.startsWith(k));
+  return key ? TX_ICON[key] : { icon: "wallet" as const, tone: "tx-ico" };
+}
+
 export default function Balance() {
-  const { me } = usePlayer();
-  const [tx, setTx] = useState<TxRow[]>([]);
-  const [stats, setStats] = useState<SystemStats | null>(null);
-
-  useEffect(() => {
-    api.systemStats().then(setStats).catch(() => undefined);
-  }, [me?.balance]);
-
-  useEffect(() => {
-    if (!me) return;
-    api.transactions(me.id).then(setTx).catch(() => undefined);
-  }, [me?.id, me?.balance]);
-
-  if (!me) return null;
-  const total = me.balance + me.reserved;
+  const { balance, reserve, sysFund, total, tx } = useEconomy();
 
   return (
     <>
@@ -38,21 +26,21 @@ export default function Balance() {
           <Coin lg />
           <div>
             <div className="lbl">Доступно</div>
-            <div className="val">{fmt(me.balance)}</div>
+            <div className="val">{fmt(balance)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg blue />
           <div>
             <div className="lbl">В резерве</div>
-            <div className="val">{fmt(me.reserved)}</div>
+            <div className="val">{fmt(reserve)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg />
           <div>
-            <div className="lbl">Доход системы</div>
-            <div className="val">{fmt(stats?.systemIncome ?? 0)}</div>
+            <div className="lbl">Системный фонд</div>
+            <div className="val">{fmt(sysFund)}</div>
           </div>
         </div>
         <div className="bal-card">
@@ -74,33 +62,27 @@ export default function Balance() {
           }}
         >
           <h3 style={{ margin: 0 }}>Последние операции</h3>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-            Раундов сыграно: {stats?.roundsPlayed ?? 0} · выплатлено: {fmt(stats?.totalPayouts ?? 0)}
-          </span>
         </div>
 
-        {tx.map((t) => {
-          const meta = TX_META[t.type] ?? { icon: "wallet" as const, tone: "tx-ico" };
+        {tx.map((t, i) => {
+          const meta = txMeta(t.title);
           return (
-            <div className="tx-row" key={t.id}>
+            <div className="tx-row" key={`${t.title}-${i}`}>
               <span className={meta.tone}>
                 <Icon name={meta.icon} size={16} />
               </span>
               <span>
                 <span className="name">{t.title}</span>
                 <br />
-                <span className="date">{fmtDateTime(t.createdAt)}</span>
+                <span className="date">{t.date}</span>
               </span>
-              <span className={`amt ${t.amount >= 0 ? "plus" : "minus"}`}>{fmtSigned(t.amount)}</span>
+              <span className={`amt ${t.amount >= 0 ? "plus" : "minus"}`}>
+                {t.amount >= 0 ? "+" : "−"}
+                {fmt(Math.abs(t.amount))}
+              </span>
             </div>
           );
         })}
-
-        {tx.length === 0 && (
-          <div style={{ color: "var(--color-text-secondary)", textAlign: "center", padding: 20 }}>
-            Операций пока нет
-          </div>
-        )}
       </div>
     </>
   );

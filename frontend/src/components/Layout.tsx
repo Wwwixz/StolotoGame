@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { fmt } from "../data";
-import { usePlayer } from "../player";
 import { useRole } from "../role";
+import { useEconomy } from "../state/economy";
 import { Avatar, Coin, Icon } from "./ui";
-import { Logo } from "./graphics";
 
 const NAV = [
   { to: "/lobby", label: "Главная", icon: "home", end: true },
@@ -15,33 +13,38 @@ const NAV = [
 ] as const;
 
 const ADMIN_NAV = [
-  { to: "/admin", label: "Конфигуратор", icon: "admin" },
+  { to: "/admin", label: "Админ", icon: "admin" },
   { to: "/economy", label: "Аналитика", icon: "analytics" },
   { to: "/log", label: "Журнал", icon: "history" },
 ] as const;
 
 export default function Layout() {
   const { role } = useRole();
-  const { me, players, setMe, online } = usePlayer();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-
+  const { balance } = useEconomy();
   const items = role === "admin" ? ADMIN_NAV : NAV;
 
   return (
     <div className="app">
       <aside className="sidebar">
         <Link to="/lobby" className="logo">
-          <Logo />
+          <svg className="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+            <defs>
+              <linearGradient id="logoRed" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#ff5154" />
+                <stop offset="1" stopColor="#e31e24" />
+              </linearGradient>
+            </defs>
+            <circle cx="20" cy="20" r="20" fill="url(#logoRed)" />
+            <circle cx="21.7" cy="10" r="3.5" fill="#fff" />
+            <g stroke="#fff" strokeWidth="3.2" strokeLinecap="round" fill="none">
+              <path d="M21.4 15.4 C21.9 18.2 21.5 20.7 20.6 23.3" />
+              <path d="M20.9 16.3 L13.6 11" />
+              <path d="M21.9 15.8 L28.8 10.4" />
+              <path d="M20.6 23.5 C18.3 26.5 15.5 28.8 12.2 30.4" />
+              <path d="M20.9 23.2 C23.1 25.7 25.5 27.3 28.6 28.3" />
+            </g>
+          </svg>
+          <span className="logo-name">СТОЛОТО</span>
         </Link>
         <nav className="nav">
           {items.map((n) => (
@@ -55,10 +58,6 @@ export default function Layout() {
           <span className={`badge ${role === "admin" ? "red" : "blue"}`}>
             {role === "admin" ? "Роль: администратор" : "Роль: пользователь"}
           </span>
-          <span className={`badge ${online ? "green" : "yellow"}`}>
-            <span className="conn-dot" style={{ background: online ? "#19a463" : "#ffc400" }} />
-            {online ? "Реал-тайм подключён" : "Нет связи с сервером"}
-          </span>
           <Link to="/" className="side-switch">
             Сменить роль
           </Link>
@@ -66,49 +65,14 @@ export default function Layout() {
       </aside>
       <div className="main">
         <header className="topbar">
-          <div className="player-switch" ref={ref}>
-            <button className="balance-chip" onClick={() => setOpen((v) => !v)}>
-              <Coin />
-              {me ? fmt(me.balance) : "…"}
-              <span className="chev">▼</span>
-            </button>
-            {open && (
-              <div className="switch-pop">
-                <div className="switch-title">Тестовые игроки</div>
-                {players.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`switch-row${me?.id === p.id ? " active" : ""}`}
-                    onClick={() => {
-                      setMe(p.id);
-                      setOpen(false);
-                      navigate(0);
-                    }}
-                  >
-                    <Avatar name={p.name} size="sm" />
-                    <span className="switch-name">
-                      {p.name}
-                      <span className="switch-vip">{p.vipStatus}</span>
-                    </span>
-                    <span className="switch-balance">
-                      <Coin />
-                      {fmt(p.balance)}
-                    </span>
-                  </button>
-                ))}
-                {me && (
-                  <div className="switch-foot">
-                    В резерве: <b>{fmt(me.reserved)}</b> баллов
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          {me && (
-            <Link to="/profile">
-              <Avatar name={me.name} size="md" you />
-            </Link>
-          )}
+          <Link to="/balance" className="balance-chip">
+            <Coin />
+            {fmt(balance)}
+            <span className="chev">▼</span>
+          </Link>
+          <Link to="/profile">
+            <Avatar name="АК" size="md" />
+          </Link>
         </header>
         <main className="content">
           <Outlet />
