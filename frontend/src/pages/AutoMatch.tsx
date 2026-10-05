@@ -1,29 +1,37 @@
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ROOMS, fmt } from "../data";
+import { Link, useLocation } from "react-router-dom";
+import { fmt, pct, winProb, ROOMS } from "../data";
 import type { Room } from "../types";
 import { Icon } from "../components/ui";
 import RoomCard from "../components/RoomCard";
+import { GAME_LIST } from "../games";
 
-const PLACES = [1, 2, 5, 10];
+const PLACES = [5, 6, 8, 10];
 
 export default function AutoMatch() {
+  const location = useLocation();
+  const preset = (location.state ?? {}) as {
+    places?: number;
+    priceMin?: number;
+    priceMax?: number;
+    fund?: number;
+  };
+
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [places, setPlaces] = useState(10);
-  const [priceMin, setPriceMin] = useState(50);
-  const [priceMax, setPriceMax] = useState(500);
-  const [fund, setFund] = useState(1000);
-  const [format, setFormat] = useState("Любой");
+  const [places, setPlaces] = useState<number>(preset.places ?? 10);
+  const [priceMin, setPriceMin] = useState<number>(preset.priceMin ?? 50);
+  const [priceMax, setPriceMax] = useState<number>(preset.priceMax ?? 500);
+  const [fund, setFund] = useState<number>(preset.fund ?? 1000);
+  const [game, setGame] = useState<string>("any");
   const [results, setResults] = useState<{ exact: boolean; rooms: Room[] } | null>(null);
 
   const find = () => {
     const byCloseness = (a: Room, b: Room) =>
       Math.abs(a.places - places) - Math.abs(b.places - places);
 
-    const matched = ROOMS
-      .filter((r) => r.price >= priceMin && r.price <= priceMax)
+    const matched = ROOMS.filter((r) => r.price >= priceMin && r.price <= priceMax)
       .filter((r) => r.prizePool >= fund)
-      .filter((r) => format === "Любой" || r.name === format)
+      .filter((r) => game === "any" || r.game === game)
       .sort(byCloseness);
 
     const exact = matched.length > 0;
@@ -38,11 +46,7 @@ export default function AutoMatch() {
     );
   };
 
-  const forecastFor = (r: Room) => {
-    const base = 100 / r.places;
-    const boosted = base * (1 + r.boostPercent / 100);
-    return `${boosted.toFixed(1).replace(".", ",")}%`;
-  };
+  const forecastFor = (r: Room) => pct(winProb(r, true));
 
   return (
     <>
@@ -115,14 +119,24 @@ export default function AutoMatch() {
           </div>
 
           <div className="field">
-            <label>Формат комнаты</label>
-            <select className="select" value={format} onChange={(e) => setFormat(e.target.value)}>
-              <option>Любой</option>
-              <option>Классическая</option>
-              <option>Быстрая</option>
-              <option>Премиум</option>
-              <option>VIP</option>
-            </select>
+            <label>Формат игры</label>
+            <div className="chips">
+              <button
+                className={`chip${game === "any" ? " active" : ""}`}
+                onClick={() => setGame("any")}
+              >
+                Любой
+              </button>
+              {GAME_LIST.map((g) => (
+                <button
+                  key={g.type}
+                  className={`chip${game === g.type ? " active" : ""}`}
+                  onClick={() => setGame(g.type)}
+                >
+                  {g.short}
+                </button>
+              ))}
+            </div>
           </div>
 
           <button className="btn btn-red btn-block btn-lg" onClick={find}>

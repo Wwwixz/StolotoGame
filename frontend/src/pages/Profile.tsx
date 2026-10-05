@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { BALANCE, CURRENT_USER, HISTORY, RESERVE, fmt } from "../data";
+import { CURRENT_USER, fmt } from "../data";
+import { useEconomy } from "../state/economy";
 import { Avatar, Coin, Icon, Stat, YouBadge } from "../components/ui";
 
 const ACHIEVEMENTS = [
@@ -12,6 +13,10 @@ const ACHIEVEMENTS = [
 ] as const;
 
 export default function Profile() {
+  const { balance, reserve, history } = useEconomy();
+  const lastGames = history.slice(0, 4);
+  const wins = history.filter((h) => h.result === "win").length;
+
   return (
     <>
       <h1 className="page-title">Профиль</h1>
@@ -27,20 +32,29 @@ export default function Profile() {
         <div className="profile-chips">
           <span className="balance-chip">
             <Coin />
-            {fmt(BALANCE)}
+            {fmt(balance)}
           </span>
           <span className="balance-chip">
             <Coin blue />
-            {fmt(RESERVE)}
+            {fmt(reserve)}
           </span>
         </div>
       </div>
 
       <div className="stat-row" style={{ margin: "16px 0" }}>
-        <Stat icon={<Coin />} value={fmt(BALANCE)} label="баланс" tone="gold" />
-        <Stat icon={<Icon name="users" />} value="24" label="игр сыграно" />
-        <Stat icon={<Icon name="trophy" />} value="9" label="побед" tone="green" />
-        <Stat icon={<Icon name="percent" />} value="37,5%" label="винрейт" tone="blue" />
+        <Stat icon={<Coin />} value={fmt(balance)} label="баланс" tone="gold" />
+        <Stat icon={<Icon name="users" />} value={String(history.length)} label="игр сыграно" />
+        <Stat icon={<Icon name="trophy" />} value={String(wins)} label="побед" tone="green" />
+        <Stat
+          icon={<Icon name="percent" />}
+          value={
+            history.length > 0
+              ? `${((wins / history.length) * 100).toFixed(1).replace(".", ",")}%`
+              : "—"
+          }
+          label="винрейт"
+          tone="blue"
+        />
       </div>
 
       <div className="two-col">
@@ -59,7 +73,7 @@ export default function Profile() {
             </Link>
           </div>
 
-          {HISTORY.slice(0, 4).map((h, i) => (
+          {lastGames.map((h, i) => (
             <div className="tx-row" key={i}>
               {h.result === "win" ? (
                 <span className="tag-win">● Выигрыш</span>

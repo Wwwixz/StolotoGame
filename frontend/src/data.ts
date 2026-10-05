@@ -1,4 +1,12 @@
-import type { HistoryRow, LogRow, Participant, Room, TxRow } from "./types";
+import type {
+  HistoryRow,
+  LogRow,
+  Participant,
+  PrizeRow,
+  RoundResult,
+  Room,
+  TxRow,
+} from "./types";
 
 export const TODAY = new Date();
 export const MONTH_START = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
@@ -13,13 +21,21 @@ export function daysAgoDateTime(n: number, hhmm: string): string {
   return `${daysAgoDate(n)} ${hhmm}`;
 }
 
+export function nowDateTime(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${daysAgoDate(0)} ${hh}:${mm}`;
+}
+
 export const ROOMS: Room[] = [
   {
     id: 1,
     name: "Классическая",
     icon: "flame",
     hex: "red",
-    places: 10,
+    game: "wheel",
+    places: 8,
     occupied: 6,
     price: 100,
     prizePool: 8500,
@@ -29,56 +45,60 @@ export const ROOMS: Room[] = [
     popular: true,
     fastDraw: true,
     description:
-      "Классическая комната с оптимальным соотношением цены и выигрыша. Подходит для новичков и опытных игроков.",
+      "Классическая комната с оптимальным соотношением цены и выигрыша. Колесо Фортуны решает судьбу — победитель забирает половину фонда.",
   },
   {
     id: 2,
     name: "Быстрая",
     icon: "zap",
     hex: "green",
+    game: "race",
     places: 5,
-    occupied: 3,
+    occupied: 4,
     price: 50,
     prizePool: 4200,
     fundPercent: 85,
     boostPercent: 25,
     boostPrice: 25,
     fastDraw: true,
-    description: "Ускоренный розыгрыш: раунд занимает меньше минуты.",
+    description: "Ускоренная гонка: меньше мест, короче раунд — меньше минуты до результата.",
   },
   {
     id: 3,
     name: "Премиум",
     icon: "star",
     hex: "orange",
-    places: 20,
-    occupied: 12,
+    game: "cards",
+    places: 10,
+    occupied: 6,
     price: 200,
     prizePool: 18000,
     fundPercent: 85,
     boostPercent: 25,
     boostPrice: 100,
-    description: "Повышенный призовой фонд и больше участников в раунде.",
+    popular: true,
+    description: "Карточный дуэль: каждый открывает карту, лучшая забирает главный приз.",
   },
   {
     id: 4,
     name: "VIP",
     icon: "crown",
     hex: "gold",
-    places: 50,
-    occupied: 18,
+    game: "wheel",
+    places: 10,
+    occupied: 6,
     price: 500,
     prizePool: 42500,
     fundPercent: 85,
     boostPercent: 25,
     boostPrice: 250,
-    description: "Максимальный призовой фонд для крупных ставок.",
+    description: "Максимальный призовой фонд для крупных ставок. Колесо крутится только раз.",
   },
 ];
 
-export function getRoom(id: string | undefined): Room {
+export function getRoom(id: string | undefined): Room | undefined {
   const n = Number(id);
-  return ROOMS.find((r) => r.id === n) ?? ROOMS[0];
+  return ROOMS.find((r) => r.id === n);
 }
 
 export function roomNum(id: number): string {
@@ -87,10 +107,9 @@ export function roomNum(id: number): string {
 
 export const CURRENT_USER = "player_4827";
 
-export const BALANCE = 12450;
-export const RESERVE = 2800;
-export const SYS_FUND = 950;
-export const TOTAL_BALANCE = 16200;
+export const INITIAL_BALANCE = 12450;
+export const INITIAL_RESERVE = 2800;
+export const INITIAL_SYS_FUND = 950;
 
 export const PARTICIPANTS: Participant[] = [
   { name: "player_4827", bot: false, you: true },
@@ -103,13 +122,82 @@ export const PARTICIPANTS: Participant[] = [
 
 export const BOTS: string[] = ["bot_03", "bot_11", "bot_12", "bot_24"];
 
-export const WINNERS = [
-  { place: 1, name: "player_4827", prize: 8500 },
-  { place: 2, name: "player_6194", prize: 2340 },
-  { place: 3, name: "bot_12", prize: 1200 },
-];
+export function roomHumans(room: Room): Participant[] {
+  return PARTICIPANTS.slice(0, Math.min(PARTICIPANTS.length, room.places - 1));
+}
 
-export const COMBOS: number[] = [8, 12, 23, 31, 42];
+export function roomBots(room: Room): string[] {
+  const free = room.places - roomHumans(room).length;
+  return BOTS.slice(0, Math.max(0, free));
+}
+
+export function allNames(room: Room): string[] {
+  return [...roomHumans(room).map((p) => p.name), ...roomBots(room)];
+}
+
+const RESULT_MOCKS: Record<
+  number,
+  { winner: string; second: string; third: string; combo: number[]; seed: string }
+> = {
+  1: {
+    winner: "player_4827",
+    second: "player_6194",
+    third: "bot_12",
+    combo: [8, 12, 23, 31, 42],
+    seed: "5f7ac1e0",
+  },
+  2: {
+    winner: "bot_11",
+    second: "player_6194",
+    third: "player_4831",
+    combo: [4, 9, 17, 26, 38],
+    seed: "9b31d2f4",
+  },
+  3: {
+    winner: "player_4827",
+    second: "bot_24",
+    third: "player_7102",
+    combo: [3, 11, 25, 34, 44],
+    seed: "c48a77b2",
+  },
+  4: {
+    winner: "bot_24",
+    second: "player_4831",
+    third: "player_6194",
+    combo: [7, 15, 29, 36, 41],
+    seed: "1e0b55aa",
+  },
+};
+
+export function getRoundResult(room: Room): RoundResult {
+  const m = RESULT_MOCKS[room.id] ?? RESULT_MOCKS[1];
+  const first = Math.round(room.prizePool * 0.5);
+  const second = Math.round(room.prizePool * 0.3);
+  const third = room.prizePool - first - second;
+  const top: PrizeRow[] = [
+    { place: 1, name: m.winner, prize: first },
+    { place: 2, name: m.second, prize: second },
+    { place: 3, name: m.third, prize: third },
+  ];
+  return {
+    winner: m.winner,
+    winnerIsBot: m.winner.startsWith("bot_"),
+    top,
+    combo: m.combo,
+    seed: m.seed,
+  };
+}
+
+/** Вероятность победы одного игрока: базовая 1/мест, с бустом — его вес растёт на boostPercent */
+export function winProb(room: Room, boost: boolean): number {
+  if (!boost) return 1 / room.places;
+  const b = room.boostPercent / 100;
+  return (1 + b) / (room.places - 1 + 1 + b);
+}
+
+export function pct(x: number): string {
+  return `${(x * 100).toFixed(1).replace(".", ",")}%`;
+}
 
 export const HISTORY: HistoryRow[] = [
   { date: daysAgoDate(1), room: "Классическая", result: "win", amount: 8500 },

@@ -1,19 +1,25 @@
 import { useState } from "react";
-import { ROUND_LOG, MONTH_START, TODAY, toInputDate } from "../data";
+import { useEconomy } from "../state/economy";
+import { MONTH_START, TODAY, toInputDate } from "../data";
 import { AdminTabs, Panel } from "../components/admin";
 import { Icon } from "../components/ui";
 
 export default function ExpertLog() {
+  const { log } = useEconomy();
   const [q, setQ] = useState("");
-  const rows = ROUND_LOG.filter(
-    (r) => !q || r.room.toLowerCase().includes(q.toLowerCase()) || r.winner.includes(q) || r.id.includes(q),
+  const rows = log.filter(
+    (r) =>
+      !q ||
+      r.room.toLowerCase().includes(q.toLowerCase()) ||
+      r.winner.includes(q) ||
+      r.id.includes(q),
   );
 
   return (
     <>
       <h1 className="page-title">Журнал раундов</h1>
       <p style={{ color: "var(--color-text-secondary)", margin: "-12px 0 12px", fontSize: 14 }}>
-        Журнал раундов для экспертов
+        Журнал раундов для экспертов: ID, параметры, seed и победитель
       </p>
       <AdminTabs active="log" />
 
@@ -36,7 +42,7 @@ export default function ExpertLog() {
             <Icon name="search" size={16} />
             <input
               className="input"
-              placeholder="Поиск по ID комнаты…"
+              placeholder="Поиск по ID, комнате или победителю…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -55,8 +61,8 @@ export default function ExpertLog() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
+            {rows.map((r, i) => (
+              <tr key={`${r.id}-${i}`}>
                 <td style={{ fontWeight: 600 }}>{r.id}</td>
                 <td>{r.room}</td>
                 <td>{r.time}</td>

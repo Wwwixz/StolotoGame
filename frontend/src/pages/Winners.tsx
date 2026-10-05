@@ -1,7 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BOTS, COMBOS, CURRENT_USER, PARTICIPANTS, WINNERS, fmt, getRoom } from "../data";
+import {
+  CURRENT_USER,
+  fmt,
+  getRoom,
+  getRoundResult,
+  roomBots,
+  roomHumans,
+  roomNum,
+} from "../data";
 import { Avatar, Icon, YouBadge } from "../components/ui";
+import RoomNotFound from "../components/RoomNotFound";
+import { GAMES } from "../games";
 
 const COLORS = ["#e31e24", "#ffc400", "#3478f6", "#19a463", "#7b5cf0"];
 
@@ -11,10 +21,6 @@ export default function Winners() {
   const { id } = useParams();
   const navigate = useNavigate();
   const room = getRoom(id);
-  const [showAll, setShowAll] = useState(false);
-
-  const everyone = [...PARTICIPANTS.map((p) => p.name), ...BOTS].slice(0, room.places);
-  const prizeByName = new Map(WINNERS.map((w) => [w.name, w.prize]));
 
   const confetti = useMemo(
     () =>
@@ -28,10 +34,21 @@ export default function Winners() {
     [],
   );
 
-  const top = WINNERS[0];
+  if (!room) return <RoomNotFound />;
+
+  const result = getRoundResult(room);
+  const everyone = [...roomHumans(room).map((p) => p.name), ...roomBots(room)];
+  const prizeByName = new Map(result.top.map((w) => [w.name, w.prize]));
+  const top = result.top[0];
+  const youWin = top.name === CURRENT_USER;
 
   return (
     <>
+      <h1 className="page-title">
+        Комната {roomNum(room.id)}
+        <span className="badge yellow">{GAMES[room.game].short}</span>
+      </h1>
+
       <section className="winners-hero">
         <div className="confetti">
           {confetti.map((c, i) => (
@@ -51,93 +68,116 @@ export default function Winners() {
         <span style={{ display: "inline-flex", color: "var(--color-yellow)" }}>
           <Icon name="trophy" size={54} strokeWidth={1.6} />
         </span>
-        <h2>Победители!</h2>
+        <h2>{youWin ? "Вы победили!" : "Победители!"}</h2>
 
         <div className="hero-winner">
           <span className="medal gold">1</span>
-          <Avatar name={top.name} size="md" you={top.name === CURRENT_USER} />
+          <Avatar name={top.name} size="md" you={youWin} bot={top.name.startsWith("bot_")} />
           <span>
             <span className="name">
               {top.name}
-              {top.name === CURRENT_USER && <YouBadge />}
+              {youWin && <YouBadge />}
             </span>
             <br />
             <span className="sub">Выигрыш: {fmt(top.prize)} баллов</span>
           </span>
         </div>
+
+        {result.winnerIsBot && (
+          <div
+            style={{
+              maxWidth: 460,
+              margin: "18px auto 0",
+              background: "var(--color-blue-light)",
+              border: "1px solid #bbd3fa",
+              borderRadius: 12,
+              padding: "10px 16px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#245eb8",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="bot" size={16} />
+            Бот забрал призовой фонд — его часть остаётся в системе
+          </div>
+        )}
       </section>
 
       <div className="two-col" style={{ marginTop: 16 }}>
         <div className="panel">
           <h3>Результаты раунда</h3>
           <div className="winner-list" style={{ maxWidth: "none" }}>
-            {(showAll
-              ? everyone.map((name, i) => ({
-                  place: i + 1,
-                  name,
-                  prize: prizeByName.get(name) ?? 0,
-                }))
-              : WINNERS.map((w) => ({ ...w }))
-            ).map((w) => (
-              <div key={w.place} className="winner-row">
-                <span className={`medal ${w.place <= 3 ? MEDAL_TONE[w.place - 1] : "plain"}`}>
-                  {w.place}
-                </span>
-                <Avatar name={w.name} size="sm" bot={w.name.startsWith("bot_")} you={w.name === CURRENT_USER} />
+            {result.top.map((w) => (
+              <div
+                key={w.place}
+                className={`winner-row${w.place === 1 ? " first" : ""}`}
+              >
+                <span className={`medal ${MEDAL_TONE[w.place - 1]}`}>{w.place}</span>
+                <Avatar
+                  name={w.name}
+                  size="sm"
+                  bot={w.name.startsWith("bot_")}
+                  you={w.name === CURRENT_USER}
+                />
                 <span className="name">
                   {w.name}
                   {w.name === CURRENT_USER && <YouBadge />}
                 </span>
-                <span className="prize">
-                  <i
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background:
-                        w.prize > 0
-                          ? w.place === 1
-                            ? "#ffc400"
-                            : "#19a463"
-                          : "#d1d5db",
-                    }}
-                  />
-                  {w.prize > 0 ? fmt(w.prize) : "—"}
-                </span>
+                <span className="prize">+{fmt(w.prize)}</span>
               </div>
             ))}
           </div>
-          <button className="link-btn" onClick={() => setShowAll((v) => !v)}>
-            {showAll ? "Скрыть участников" : `Показать всех участников (${room.places})`}
-          </button>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 14 }}>
+            Остальные участники ({everyone.length - result.top.length}) без приза —
+            их входы формируют системную долю и призовой фонд
+          </p>
         </div>
 
         <div className="aside-stack">
           <div className="panel">
-            <h3>Комбинации</h3>
+            <h3>Комбинация раунда</h3>
             <div className="avatar-row">
-              {COMBOS.map((n) => (
-                <span key={n} className="ball">
+              {result.combo.map((n, i) => (
+                <span key={`${n}-${i}`} className="ball">
                   {n}
                 </span>
               ))}
             </div>
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 10 }}>
+              Победитель получает бонусную сущность — выигрышную комбинацию
+            </p>
           </div>
 
-          <div className="btn-row" style={{ marginTop: 0 }}>
-            <button
-              className="btn btn-red"
-              style={{ flex: 1 }}
-              onClick={() => navigate("/")}
-            >
-              В лобби
+          <div className="btn-row" style={{ marginTop: 0, flexDirection: "column", alignItems: "stretch" }}>
+            <button className="btn btn-red" onClick={() => navigate(`/rooms/${room.id}/waiting`)}>
+              Ещё раз в этой комнате
             </button>
             <button
               className="btn btn-ghost"
-              style={{ flex: 1 }}
-              onClick={() => navigate("/auto-match")}
+              onClick={() =>
+                navigate("/auto-match", {
+                  state: { places: room.places, priceMax: room.price, fund: Math.min(42000, Math.round(room.prizePool / 2)) },
+                })
+              }
             >
-              Сыграть ещё
+              Похожие условия
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() =>
+                navigate("/auto-match", {
+                  state: { places: Math.max(room.places, 10), priceMin: Math.min(500, room.price * 2), priceMax: 500, fund: room.prizePool },
+                })
+              }
+            >
+              Рискованнее: дороже и больший фонд
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate("/lobby")}>
+              В лобби
             </button>
           </div>
         </div>

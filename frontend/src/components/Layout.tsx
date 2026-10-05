@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BALANCE, fmt } from "../data";
+import { fmt } from "../data";
 import { useRole } from "../role";
+import { useEconomy } from "../state/economy";
 import { Avatar, Coin, Icon } from "./ui";
 
 const NAV = [
@@ -19,6 +20,7 @@ const ADMIN_NAV = [
 
 export default function Layout() {
   const { role } = useRole();
+  const { balance } = useEconomy();
   const items = role === "admin" ? ADMIN_NAV : NAV;
 
   return (
@@ -63,11 +65,11 @@ export default function Layout() {
       </aside>
       <div className="main">
         <header className="topbar">
-          <button className="balance-chip">
+          <Link to="/balance" className="balance-chip">
             <Coin />
-            {fmt(BALANCE)}
+            {fmt(balance)}
             <span className="chev">▼</span>
-          </button>
+          </Link>
           <Link to="/profile">
             <Avatar name="АК" size="md" />
           </Link>

@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { HISTORY, MONTH_START, TODAY, toInputDate } from "../data";
+import { useEconomy } from "../state/economy";
+import { MONTH_START, TODAY, toInputDate } from "../data";
 import { Icon } from "../components/ui";
 
 type Tab = "all" | "win" | "lose";
 
 export default function History() {
+  const { history } = useEconomy();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
 
-  const rows = HISTORY.filter((h) => {
+  const rows = history.filter((h) => {
     if (tab === "win" && h.result !== "win") return false;
     if (tab === "lose" && h.result !== "lose") return false;
     if (q && !h.room.toLowerCase().includes(q.toLowerCase())) return false;
@@ -54,7 +56,7 @@ export default function History() {
             <Icon name="search" size={16} />
             <input
               className="input"
-              placeholder="Поиск по ID комнаты…"
+              placeholder="Поиск по комнате…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -72,7 +74,7 @@ export default function History() {
           </thead>
           <tbody>
             {rows.map((h, i) => (
-              <tr key={i}>
+              <tr key={`${h.date}-${i}`}>
                 <td>{h.date}</td>
                 <td style={{ fontWeight: 600 }}>{h.room}</td>
                 <td>

@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import type { Room } from "../types";
 import { fmt } from "../data";
+import { GAMES } from "../games";
 import { Icon } from "./ui";
 
 export default function RoomCard({ room, forecast }: { room: Room; forecast?: string }) {
   const navigate = useNavigate();
+  const game = GAMES[room.game];
   return (
     <article className="room-card">
       <div className="room-card-top">
@@ -15,6 +17,7 @@ export default function RoomCard({ room, forecast }: { room: Room; forecast?: st
       </div>
 
       <div className="room-card-specs">
+        <span className="game-tag">{game.label}</span>
         <span className="spec">
           <b>{room.places}</b> мест
         </span>

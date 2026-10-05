@@ -1,14 +1,22 @@
-import { BALANCE, RESERVE, SYS_FUND, TOTAL_BALANCE, TRANSACTIONS, fmt } from "../data";
+import { useEconomy } from "../state/economy";
+import { fmt } from "../data";
 import { Coin, Icon } from "../components/ui";
 
-const TX_ICONS: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
-  "Вход в комнату #2847": { icon: "users", tone: "tx-ico" },
-  "Выигрыш": { icon: "trophy", tone: "tx-ico green" },
-  "Резерв": { icon: "wallet", tone: "tx-ico" },
-  "Буст": { icon: "zap", tone: "tx-ico gold" },
+const TX_ICON: Record<string, { icon: "users" | "trophy" | "wallet" | "zap"; tone: string }> = {
+  Вход: { icon: "users", tone: "tx-ico" },
+  Выигрыш: { icon: "trophy", tone: "tx-ico green" },
+  Резерв: { icon: "wallet", tone: "tx-ico" },
+  Буст: { icon: "zap", tone: "tx-ico gold" },
 };
 
+function txMeta(title: string) {
+  const key = Object.keys(TX_ICON).find((k) => title.startsWith(k));
+  return key ? TX_ICON[key] : { icon: "wallet" as const, tone: "tx-ico" };
+}
+
 export default function Balance() {
+  const { balance, reserve, sysFund, total, tx } = useEconomy();
+
   return (
     <>
       <h1 className="page-title">Баланс</h1>
@@ -18,28 +26,28 @@ export default function Balance() {
           <Coin lg />
           <div>
             <div className="lbl">Доступно</div>
-            <div className="val">{fmt(BALANCE)}</div>
+            <div className="val">{fmt(balance)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg blue />
           <div>
             <div className="lbl">В резерве</div>
-            <div className="val">{fmt(RESERVE)}</div>
+            <div className="val">{fmt(reserve)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg />
           <div>
             <div className="lbl">Системный фонд</div>
-            <div className="val">{fmt(SYS_FUND)}</div>
+            <div className="val">{fmt(sysFund)}</div>
           </div>
         </div>
         <div className="bal-card">
           <Coin lg />
           <div>
             <div className="lbl">Общий баланс</div>
-            <div className="val">{fmt(TOTAL_BALANCE)}</div>
+            <div className="val">{fmt(total)}</div>
           </div>
         </div>
       </div>
@@ -54,15 +62,12 @@ export default function Balance() {
           }}
         >
           <h3 style={{ margin: 0 }}>Последние операции</h3>
-          <a href="#" style={{ color: "var(--color-red)", fontSize: 13, fontWeight: 600 }}>
-            Все →
-          </a>
         </div>
 
-        {TRANSACTIONS.map((t, i) => {
-          const meta = TX_ICONS[t.title] ?? { icon: "wallet" as const, tone: "tx-ico" };
+        {tx.map((t, i) => {
+          const meta = txMeta(t.title);
           return (
-            <div className="tx-row" key={i}>
+            <div className="tx-row" key={`${t.title}-${i}`}>
               <span className={meta.tone}>
                 <Icon name={meta.icon} size={16} />
               </span>

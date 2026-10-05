@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import { RequireAdmin, RequireRole } from "./components/guards";
 import RoleSelect from "./pages/RoleSelect";
 import Lobby from "./pages/Lobby";
 import Games from "./pages/Games";
@@ -20,23 +21,27 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<RoleSelect />} />
-      <Route element={<Layout />}>
-        <Route path="/lobby" element={<Lobby />} />
-        <Route path="/games" element={<Games />} />
-        <Route path="/auto-match" element={<AutoMatch />} />
-        <Route path="/rooms/:id" element={<RoomDetail />} />
-        <Route path="/rooms/:id/waiting" element={<Waiting />} />
-        <Route path="/rooms/:id/bots" element={<BotsFilling />} />
-        <Route path="/rooms/:id/draw" element={<Draw />} />
-        <Route path="/rooms/:id/winners" element={<Winners />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/balance" element={<Balance />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/admin" element={<AdminConfigurator />} />
-        <Route path="/economy" element={<Economy />} />
-        <Route path="/log" element={<ExpertLog />} />
-        <Route path="*" element={<RoleSelect />} />
+      <Route element={<RequireRole />}>
+        <Route element={<Layout />}>
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="/games" element={<Games />} />
+          <Route path="/auto-match" element={<AutoMatch />} />
+          <Route path="/rooms/:id" element={<RoomDetail />} />
+          <Route path="/rooms/:id/waiting" element={<Waiting />} />
+          <Route path="/rooms/:id/bots" element={<BotsFilling />} />
+          <Route path="/rooms/:id/draw" element={<Draw />} />
+          <Route path="/rooms/:id/winners" element={<Winners />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/balance" element={<Balance />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route element={<RequireAdmin />}>
+            <Route path="/admin" element={<AdminConfigurator />} />
+            <Route path="/economy" element={<Economy />} />
+            <Route path="/log" element={<ExpertLog />} />
+          </Route>
+        </Route>
       </Route>
+      <Route path="*" element={<RoleSelect />} />
     </Routes>
   );
 }

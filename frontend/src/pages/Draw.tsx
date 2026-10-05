@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { COMBOS, WINNERS, fmt, getRoom, roomNum } from "../data";
+import { fmt, getRoom, getRoundResult, roomNum } from "../data";
 import { Avatar, Coin, Icon, Stat } from "../components/ui";
+import RoomNotFound from "../components/RoomNotFound";
+import { useEconomy } from "../state/economy";
+import { GAMES } from "../games";
 
 const STEPS = [
   "Проверка участников",
@@ -10,17 +13,14 @@ const STEPS = [
   "Показ результата",
 ];
 
-const BALL_POS = [
-  { left: 62, top: 58, delay: "0s" },
-  { left: 132, top: 96, delay: "0.35s" },
-  { left: 84, top: 136, delay: "0.7s" },
-];
-
 export default function Draw() {
   const { id } = useParams();
   const navigate = useNavigate();
   const room = getRoom(id);
+  const econ = useEconomy();
   const [done, setDone] = useState(0);
+  const [boostUsed, setBoostUsed] = useState(false);
+  const settled = useRef(false);
 
   useEffect(() => {
     if (done >= STEPS.length) return;
@@ -30,11 +30,27 @@ export default function Draw() {
 
   const finished = done >= STEPS.length;
 
+  useEffect(() => {
+    if (finished && room && !settled.current) {
+      settled.current = true;
+      setBoostUsed(econ.boost?.roomId === room.id);
+      econ.settle(room, getRoundResult(room));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished, room?.id]);
+
+  if (!room) return <RoomNotFound />;
+
+  const game = GAMES[room.game];
+  const result = getRoundResult(room);
+  const Shell = game.Shell;
+
   return (
     <>
       <h1 className="page-title">
         Комната {roomNum(room.id)}
         <span className="badge red">Розыгрыш начался</span>
+        <span className="badge yellow">{game.short}</span>
       </h1>
 
       <div className="stat-row" style={{ marginBottom: 16 }}>
@@ -46,19 +62,8 @@ export default function Draw() {
 
       <div className="two-col">
         <div className="panel" style={{ textAlign: "center" }}>
-          <h3>Розыгрыш</h3>
-          <div className="machine-wrap">
-            <div className="machine" />
-            {BALL_POS.map((p, i) => (
-              <span
-                key={i}
-                className="machine-ball"
-                style={{ left: p.left, top: p.top, animationDelay: p.delay }}
-              >
-                {COMBOS[i]}
-              </span>
-            ))}
-          </div>
+          <h3>{game.label}</h3>
+          <Shell room={room} result={result} finished={finished} />
           {!finished && (
             <div style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
               Определяем победителя…
@@ -68,9 +73,6 @@ export default function Draw() {
 
         <div className="panel">
           <h3>Текущий ход</h3>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "-8px 0 14px" }}>
-            Определяем победителя…
-          </p>
           <div className="steps" style={{ marginBottom: finished ? 20 : 0 }}>
             {STEPS.map((s, i) => (
               <div key={s} className={`step${i < done ? " done" : ""}`}>
@@ -84,11 +86,34 @@ export default function Draw() {
 
           {finished && (
             <>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--color-text-secondary)",
+                  marginBottom: 14,
+                }}
+              >
+                <span style={{ display: "inline-flex", color: "var(--color-green)" }}>
+                  <Icon name="check" size={15} />
+                </span>
+                Итог раунда: победа {result.winnerIsBot ? "бота" : "игрока"}
+                {boostUsed && (
+                  <span className="tag-win" style={{ marginLeft: 6 }}>
+                    буст · вес ×{(1 + room.boostPercent / 100).toFixed(2).replace(".", ",")}
+                  </span>
+                )}
+              </div>
+
               <h3 style={{ margin: "6px 0 10px" }}>Результаты раунда</h3>
               <div className="winner-list" style={{ maxWidth: "none", marginBottom: 18 }}>
-                {WINNERS.map((w) => (
+                {result.top.map((w) => (
                   <div key={w.place} className={`winner-row${w.place === 1 ? " first" : ""}`}>
-                    <span className={`medal ${w.place === 1 ? "gold" : w.place === 2 ? "silver" : "bronze"}`}>
+                    <span
+                      className={`medal ${w.place === 1 ? "gold" : w.place === 2 ? "silver" : "bronze"}`}
+                    >
                       {w.place}
                     </span>
                     <Avatar name={w.name} size="sm" bot={w.name.startsWith("bot_")} />
@@ -104,23 +129,20 @@ export default function Draw() {
 
               <h3 style={{ marginBottom: 10 }}>Комбинация</h3>
               <div className="avatar-row" style={{ gap: 10, marginBottom: 22 }}>
-                {COMBOS.map((n) => (
-                  <span key={n} className="ball">
+                {result.combo.map((n, i) => (
+                  <span key={`${n}-${i}`} className="ball">
                     {n}
                   </span>
                 ))}
               </div>
 
-              <div className="btn-row">
-                <button className="btn btn-red" onClick={() => navigate("/")}>
-                  В лобби
-                </button>
-                <button className="btn btn-ghost" onClick={() => navigate("/auto-match")}>
-                  Сыграть ещё
-                </button>
-                <Link className="btn btn-ghost" to={`/rooms/${room.id}/winners`}>
+              <div className="btn-row" style={{ marginTop: 0 }}>
+                <Link className="btn btn-red" to={`/rooms/${room.id}/winners`}>
                   К победителям →
                 </Link>
+                <button className="btn btn-ghost" onClick={() => navigate("/lobby")}>
+                  В лобби
+                </button>
               </div>
             </>
           )}

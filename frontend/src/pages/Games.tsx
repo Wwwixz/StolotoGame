@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROOMS } from "../data";
+import type { GameType } from "../types";
 import RoomCard from "../components/RoomCard";
+import { GAME_LIST } from "../games";
 
 type SortKey = "fund" | "price" | "places" | "speed";
+type GameFilter = GameType | null;
 
 const SORTS: [SortKey, string][] = [
   ["fund", "Сортировка: призовой фонд"],
@@ -23,10 +26,12 @@ const PRICE_FILTERS: [number | null, string][] = [
 export default function Games() {
   const [sort, setSort] = useState<SortKey>("fund");
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [game, setGame] = useState<GameFilter>(null);
 
   const rooms = useMemo(() => {
     let list = [...ROOMS];
     if (maxPrice) list = list.filter((r) => r.price <= maxPrice);
+    if (game) list = list.filter((r) => r.game === game);
     switch (sort) {
       case "fund":
         list.sort((a, b) => b.prizePool - a.prizePool);
@@ -44,7 +49,7 @@ export default function Games() {
         break;
     }
     return list;
-  }, [sort, maxPrice]);
+  }, [sort, maxPrice, game]);
 
   return (
     <>
@@ -81,6 +86,23 @@ export default function Games() {
         </select>
       </div>
 
+      <div className="chips" style={{ marginBottom: 10 }}>
+        <button
+          className={`chip${game === null ? " active" : ""}`}
+          onClick={() => setGame(null)}
+        >
+          Все форматы
+        </button>
+        {GAME_LIST.map((g) => (
+          <button
+            key={g.type}
+            className={`chip${game === g.type ? " active" : ""}`}
+            onClick={() => setGame(g.type)}
+          >
+            {g.short}
+          </button>
+        ))}
+      </div>
       <div className="chips" style={{ marginBottom: 20 }}>
         {PRICE_FILTERS.map(([value, label]) => (
           <button
