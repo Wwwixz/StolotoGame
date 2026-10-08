@@ -127,15 +127,6 @@ export default function Draw() {
                 ))}
               </div>
 
-              <h3 style={{ marginBottom: 10 }}>Комбинация</h3>
-              <div className="avatar-row" style={{ gap: 10, marginBottom: 22 }}>
-                {result.combo.map((n, i) => (
-                  <span key={`${n}-${i}`} className="ball">
-                    {n}
-                  </span>
-                ))}
-              </div>
-
               <div className="btn-row" style={{ marginTop: 0 }}>
                 <Link className="btn btn-red" to={`/rooms/${room.id}/winners`}>
                   К победителям →

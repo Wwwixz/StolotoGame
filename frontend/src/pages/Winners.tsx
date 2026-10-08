@@ -138,19 +138,7 @@ export default function Winners() {
         </div>
 
         <div className="aside-stack">
-          <div className="panel">
-            <h3>Комбинация раунда</h3>
-            <div className="avatar-row">
-              {result.combo.map((n, i) => (
-                <span key={`${n}-${i}`} className="ball">
-                  {n}
-                </span>
-              ))}
-            </div>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 10 }}>
-              Победитель получает бонусную сущность — выигрышную комбинацию
-            </p>
-          </div>
+
 
           <div className="btn-row" style={{ marginTop: 0, flexDirection: "column", alignItems: "stretch" }}>
             <button className="btn btn-red" onClick={() => navigate(`/rooms/${room.id}/waiting`)}>
